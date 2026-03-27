@@ -15,29 +15,36 @@ from project_store import list_projects, load_project, save_project
 from prompt_parser import build_system_prompt, build_user_prompt
 from slide_planner import normalize_deck, select_template_for_slide
 
-app = FastAPI(title="Fast Slide Maker", version="0.1.0")
+app = FastAPI(title="Fast Slide Maker", version="0.2.0")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 INDEX_HTML = Path("templates/index.html").read_text(encoding="utf-8")
+SETTINGS_PATH = Path("samples/llm_settings.json")
 
 
-class GenerateRequest(BaseModel):
-    prompt: str
-    slide_count: int = 6
+class LLMRuntimeConfig(BaseModel):
+    base_url: str = "http://localhost:11434"
+    endpoint: str = "/api/chat"
     model: str = "llama3"
     temperature: float = 0.2
     max_tokens: int = 1800
     use_mock: bool = False
 
 
-class RegenerateSlideRequest(BaseModel):
+class GenerateRequest(LLMRuntimeConfig):
+    prompt: str
+    slide_count: int = 6
+
+
+class RegenerateSlideRequest(LLMRuntimeConfig):
     prompt: str
     deck: dict[str, Any]
     slide_id: str
-    model: str = "llama3"
-    temperature: float = 0.2
     max_tokens: int = 800
-    use_mock: bool = False
+
+
+class ChatRequest(LLMRuntimeConfig):
+    message: str
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -45,15 +52,17 @@ def index() -> str:
     return INDEX_HTML
 
 
-def _get_llm(req_model: str, temperature: float, max_tokens: int, use_mock: bool):
-    if use_mock:
+def _get_llm(cfg: LLMRuntimeConfig):
+    if cfg.use_mock:
         return MockLLMClient(), "mock"
 
     client = OllamaClient(
         LLMConfig(
-            model=req_model,
-            temperature=temperature,
-            max_tokens=max_tokens,
+            base_url=cfg.base_url,
+            endpoint=cfg.endpoint,
+            model=cfg.model,
+            temperature=cfg.temperature,
+            max_tokens=cfg.max_tokens,
         )
     )
     ok, reason = client.health_check()
@@ -62,9 +71,27 @@ def _get_llm(req_model: str, temperature: float, max_tokens: int, use_mock: bool
     return client, "ollama"
 
 
+def _default_settings() -> dict[str, Any]:
+    return LLMRuntimeConfig().model_dump()
+
+
+@app.get("/api/settings")
+def get_settings():
+    if not SETTINGS_PATH.exists():
+        return _default_settings()
+    return json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+
+
+@app.post("/api/settings")
+def save_settings(config: LLMRuntimeConfig):
+    SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS_PATH.write_text(json.dumps(config.model_dump(), indent=2), encoding="utf-8")
+    return {"saved": str(SETTINGS_PATH), "settings": config.model_dump()}
+
+
 @app.post("/api/generate")
 def generate(req: GenerateRequest):
-    llm, mode = _get_llm(req.model, req.temperature, req.max_tokens, req.use_mock)
+    llm, mode = _get_llm(req)
     system_prompt = build_system_prompt()
     user_prompt = build_user_prompt(req.prompt, req.slide_count)
 
@@ -84,7 +111,7 @@ def generate(req: GenerateRequest):
 
 @app.post("/api/regenerate-slide")
 def regenerate_slide(req: RegenerateSlideRequest):
-    llm, mode = _get_llm(req.model, req.temperature, req.max_tokens, req.use_mock)
+    llm, mode = _get_llm(req)
 
     target = next((s for s in req.deck.get("slides", []) if s.get("id") == req.slide_id), None)
     if not target:
@@ -109,6 +136,16 @@ def regenerate_slide(req: RegenerateSlideRequest):
         raise HTTPException(status_code=500, detail=f"Failed to regenerate slide: {exc}") from exc
 
     return {"mode": mode, "slide": replacement}
+
+
+@app.post("/api/chat")
+def chat(req: ChatRequest):
+    llm, mode = _get_llm(req)
+    try:
+        reply = llm.chat(req.message)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Failed to chat: {exc}") from exc
+    return {"mode": mode, "reply": reply}
 
 
 @app.post("/api/save/{project_name}")
