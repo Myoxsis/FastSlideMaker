@@ -4,6 +4,7 @@ let state = {
   logs: [],
   referenceContext: "",
   referenceFilename: "",
+  editorOpen: false,
 };
 
 const el = (id) => document.getElementById(id);
@@ -106,6 +107,10 @@ function renderSlide() {
     return;
   }
   const slide = state.deck.slides[state.selected];
+  if (!slide) {
+    target.innerHTML = "<p>Select a slide to continue.</p>";
+    return;
+  }
   target.innerHTML = `
     <h3>${slide.title}</h3>
     <div class="meta">${slide.slide_type} • Audience: ${slide.audience}</div>
@@ -122,6 +127,7 @@ function renderSlide() {
 function bindEditor() {
   if (!state.deck) return;
   const s = state.deck.slides[state.selected];
+  if (!s) return;
   el("titleEdit").value = s.title;
   el("objectiveEdit").value = s.objective;
   el("summaryEdit").value = s.summary;
@@ -132,6 +138,7 @@ function bindEditor() {
 function applyEdits() {
   if (!state.deck) return;
   const s = state.deck.slides[state.selected];
+  if (!s) return;
   s.title = el("titleEdit").value;
   s.objective = el("objectiveEdit").value;
   s.summary = el("summaryEdit").value;
@@ -139,6 +146,37 @@ function applyEdits() {
   s.relationships = el("relationshipsEdit").value.split("\n").map((x) => x.trim()).filter(Boolean);
   addLog("app", `Slide ${state.selected + 1} updated manually.`);
   renderAll();
+}
+
+function createBlankSlide() {
+  const nextIndex = (state.deck?.slides?.length || 0) + 1;
+  return {
+    id: `s${Date.now()}`,
+    title: `New Slide ${nextIndex}`,
+    objective: "",
+    slide_type: "custom",
+    audience: "",
+    summary: "",
+    audience_takeaway: "",
+    key_entities: [],
+    relationships: [],
+    priority_of_information: [],
+    content_blocks: [],
+    diagram_data: {
+      nodes: [],
+      edges: [],
+      lanes: [],
+      layers: [],
+      milestones: [],
+      annotations: [],
+    },
+    layout_hints: { density: "medium", emphasis: "content" },
+  };
+}
+
+function toggleEditor(forceOpen = !state.editorOpen) {
+  state.editorOpen = forceOpen;
+  el("slideEditor").classList.toggle("hidden", !state.editorOpen);
 }
 
 function renderChat() {
@@ -165,7 +203,9 @@ function renderLogs() {
 function renderAll() {
   renderTabs();
   renderSlide();
-  bindEditor();
+  if (state.editorOpen) {
+    bindEditor();
+  }
   renderLogs();
 }
 
@@ -192,6 +232,7 @@ el("generateBtn").onclick = async () => {
     const result = await callApi("/api/generate", "POST", config);
     state.deck = result.deck;
     state.selected = 0;
+    toggleEditor(false);
     renderAll();
     setStatus(`Deck generated (${result.mode}).`);
   } catch (e) {
@@ -239,6 +280,7 @@ el("loadBtn").onclick = async () => {
     if (!name) return;
     state.deck = await callApi(`/api/load/${name}`);
     state.selected = 0;
+    toggleEditor(false);
     renderAll();
     setStatus(`Loaded ${name}.`);
   } catch (e) {
@@ -257,6 +299,21 @@ el("exportBtn").onclick = () => {
 };
 
 el("applyEditBtn").onclick = () => applyEdits();
+el("editSlideBtn").onclick = () => {
+  if (!state.deck) return setStatus("Generate deck first.");
+  toggleEditor(true);
+  bindEditor();
+};
+el("cancelEditBtn").onclick = () => toggleEditor(false);
+el("addSlideBtn").onclick = () => {
+  if (!state.deck) return setStatus("Generate deck first.");
+  state.deck.slides.push(createBlankSlide());
+  state.selected = state.deck.slides.length - 1;
+  toggleEditor(true);
+  bindEditor();
+  addLog("app", `Blank slide ${state.selected + 1} created.`);
+  renderAll();
+};
 
 el("sendChatBtn").onclick = async () => {
   const msg = el("chatInput").value.trim();
