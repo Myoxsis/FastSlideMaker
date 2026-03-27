@@ -5,6 +5,13 @@ let state = {
   referenceContext: "",
   referenceFilename: "",
   editorOpen: false,
+  selectedElementId: null,
+  pendingImageSlideIndex: null,
+  drag: {
+    elementId: null,
+    offsetX: 0,
+    offsetY: 0,
+  },
 };
 
 const el = (id) => document.getElementById(id);
@@ -83,6 +90,66 @@ function renderTabs() {
   });
 }
 
+function ensureCanvasSlide(slide) {
+  slide.canvas_elements = Array.isArray(slide.canvas_elements) ? slide.canvas_elements : [];
+}
+
+function normalizeDeck(deck) {
+  if (!deck?.slides) return deck;
+  deck.slides.forEach((slide) => ensureCanvasSlide(slide));
+  return deck;
+}
+
+function getCurrentSlide() {
+  if (!state.deck) return null;
+  return state.deck.slides[state.selected] || null;
+}
+
+function getSelectedElement() {
+  const slide = getCurrentSlide();
+  if (!slide || !state.selectedElementId) return null;
+  return slide.canvas_elements.find((x) => x.id === state.selectedElementId) || null;
+}
+
+function syncShapeEditor() {
+  const selected = getSelectedElement();
+  el("shapeTextInput").value = selected?.text || "";
+  el("shapeFillInput").value = selected?.fill || "#dbeafe";
+  el("shapeTextColorInput").value = selected?.color || "#111827";
+  el("shapeBorderInput").value = selected?.border || "#93c5fd";
+}
+
+function selectElement(elementId) {
+  state.selectedElementId = elementId;
+  renderSlide();
+  syncShapeEditor();
+}
+
+function addCanvasElement(kind, overrides = {}) {
+  const slide = getCurrentSlide();
+  if (!slide) return setStatus("Create or generate a slide first.");
+  ensureCanvasSlide(slide);
+
+  const id = `el_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+  const base = {
+    id,
+    kind,
+    text: kind === "text" ? "New text" : kind === "image" ? "" : "Shape",
+    x: 40,
+    y: 40,
+    w: kind === "image" ? 180 : 150,
+    h: kind === "circle" ? 90 : kind === "diamond" ? 100 : 70,
+    fill: kind === "text" ? "#ffffff" : "#dbeafe",
+    border: "#93c5fd",
+    color: "#111827",
+    src: "",
+  };
+  const element = { ...base, ...overrides };
+  slide.canvas_elements.push(element);
+  selectElement(id);
+  addLog("app", `Added ${kind} element.`);
+}
+
 function renderDiagram(slide) {
   const t = slide.template;
   if (t === "process_flow") {
@@ -111,6 +178,7 @@ function renderSlide() {
     target.innerHTML = "<p>Select a slide to continue.</p>";
     return;
   }
+  ensureCanvasSlide(slide);
   target.innerHTML = `
     <h3>${slide.title}</h3>
     <div class="meta">${slide.slide_type} • Audience: ${slide.audience}</div>
@@ -121,7 +189,53 @@ function renderSlide() {
     <div class="box" style="margin-top:10px;"><b>Summary</b><p>${slide.summary}</p></div>
     <div style="margin-top:8px;">${(slide.key_entities || []).map((x) => `<span class="badge">${x}</span>`).join("")}</div>
     ${renderDiagram(slide)}
+    <div id="canvasBoard" class="canvas-board"></div>
   `;
+  const board = el("canvasBoard");
+  slide.canvas_elements.forEach((item) => {
+    const node = document.createElement("div");
+    node.className = `canvas-element ${item.kind} ${item.id === state.selectedElementId ? "selected" : ""}`;
+    node.style.left = `${item.x}px`;
+    node.style.top = `${item.y}px`;
+    node.style.width = `${item.w}px`;
+    node.style.height = `${item.h}px`;
+    node.style.background = item.fill;
+    node.style.color = item.color;
+    node.style.borderColor = item.border;
+    node.dataset.id = item.id;
+    if (item.kind === "diamond") {
+      node.innerHTML = `<span>${item.text || ""}</span>`;
+    } else if (item.kind === "image") {
+      node.innerHTML = item.src ? `<img src="${item.src}" alt="Slide image" />` : "<span>Image</span>";
+    } else {
+      node.textContent = item.text || "";
+    }
+
+    node.onpointerdown = (ev) => {
+      ev.preventDefault();
+      state.drag.elementId = item.id;
+      state.drag.offsetX = ev.clientX - item.x;
+      state.drag.offsetY = ev.clientY - item.y;
+      selectElement(item.id);
+    };
+    board.appendChild(node);
+  });
+
+  board.onpointermove = (ev) => {
+    if (!state.drag.elementId) return;
+    const moving = slide.canvas_elements.find((x) => x.id === state.drag.elementId);
+    if (!moving) return;
+    const rect = board.getBoundingClientRect();
+    moving.x = Math.max(0, Math.min(rect.width - moving.w, ev.clientX - rect.left - state.drag.offsetX));
+    moving.y = Math.max(0, Math.min(rect.height - moving.h, ev.clientY - rect.top - state.drag.offsetY));
+    renderSlide();
+  };
+  board.onpointerup = () => {
+    state.drag.elementId = null;
+  };
+  board.onpointerleave = () => {
+    state.drag.elementId = null;
+  };
 }
 
 function bindEditor() {
@@ -171,6 +285,7 @@ function createBlankSlide() {
       annotations: [],
     },
     layout_hints: { density: "medium", emphasis: "content" },
+    canvas_elements: [],
   };
 }
 
@@ -207,6 +322,7 @@ function renderAll() {
     bindEditor();
   }
   renderLogs();
+  syncShapeEditor();
 }
 
 async function loadSettings() {
@@ -230,7 +346,7 @@ el("generateBtn").onclick = async () => {
     setStatus("Generating deck...");
     const config = getConfig();
     const result = await callApi("/api/generate", "POST", config);
-    state.deck = result.deck;
+    state.deck = normalizeDeck(result.deck);
     state.selected = 0;
     toggleEditor(false);
     renderAll();
@@ -254,6 +370,7 @@ el("regenerateBtn").onclick = async () => {
       max_tokens: 1000,
     });
     state.deck.slides[state.selected] = result.slide;
+    ensureCanvasSlide(state.deck.slides[state.selected]);
     renderAll();
     setStatus(`Slide regenerated (${result.mode}).`);
   } catch (e) {
@@ -279,6 +396,7 @@ el("loadBtn").onclick = async () => {
     const name = prompt(`Available: ${list.projects.join(", ")}\nProject name to load:`);
     if (!name) return;
     state.deck = await callApi(`/api/load/${name}`);
+    normalizeDeck(state.deck);
     state.selected = 0;
     toggleEditor(false);
     renderAll();
@@ -313,6 +431,55 @@ el("addSlideBtn").onclick = () => {
   bindEditor();
   addLog("app", `Blank slide ${state.selected + 1} created.`);
   renderAll();
+};
+
+el("addTextBtn").onclick = () => addCanvasElement("text");
+el("addRectBtn").onclick = () => addCanvasElement("rectangle");
+el("addCircleBtn").onclick = () => addCanvasElement("circle");
+el("addDiamondBtn").onclick = () => addCanvasElement("diamond");
+el("addImageBtn").onclick = () => {
+  if (!state.deck) return setStatus("Generate deck first.");
+  state.pendingImageSlideIndex = state.selected;
+  el("imageUploadInput").click();
+};
+
+el("imageUploadInput").onchange = async (event) => {
+  const [file] = event.target.files || [];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    if (state.pendingImageSlideIndex !== state.selected) {
+      state.pendingImageSlideIndex = state.selected;
+    }
+    addCanvasElement("image", { src: String(reader.result || "") });
+    renderAll();
+  };
+  reader.readAsDataURL(file);
+};
+
+el("shapeTextInput").oninput = (event) => {
+  const selected = getSelectedElement();
+  if (!selected) return;
+  selected.text = event.target.value;
+  renderSlide();
+};
+el("shapeFillInput").oninput = (event) => {
+  const selected = getSelectedElement();
+  if (!selected) return;
+  selected.fill = event.target.value;
+  renderSlide();
+};
+el("shapeTextColorInput").oninput = (event) => {
+  const selected = getSelectedElement();
+  if (!selected) return;
+  selected.color = event.target.value;
+  renderSlide();
+};
+el("shapeBorderInput").oninput = (event) => {
+  const selected = getSelectedElement();
+  if (!selected) return;
+  selected.border = event.target.value;
+  renderSlide();
 };
 
 el("sendChatBtn").onclick = async () => {

@@ -1,10 +1,16 @@
 # Fast Slide Maker (Offline, Ollama-powered)
 
-Local web app that generates consulting-style PowerPoint slide specifications for **process** and **IT solution design** content.
+Local web app focused on a **minimal PowerPoint-like editor first**, with optional AI assistance for slide generation.
 
 ## What this app does
 
-- Takes a user prompt and generates a structured presentation plan.
+- Provides a manual canvas with essential editing controls:
+  - Add and edit text boxes
+  - Add images
+  - Add basic forms/shapes (rectangle, circle, diamond)
+  - Change fill, text, and border colors
+  - Drag elements to position them on a slide
+- Takes a user prompt and can generate a structured presentation plan (optional).
 - Enforces a JSON-first workflow (no free text output from LLM).
 - Validates/normalizes slide schema before rendering.
 - Uses deterministic layout templates for predictable visual quality.
@@ -58,12 +64,12 @@ Open: `http://127.0.0.1:8000`
 
 ## Usage flow
 
-1. Enter prompt in left panel.
-2. (Optional) Upload an existing `.pptx` in Copilot tab to provide reference context.
-3. Click **Generate Deck**.
-4. Review slides in center panel.
-5. Edit structured fields in right panel.
-6. Click **Regenerate Slide** for selected slide.
+1. Build slides manually from the center toolbar (`+ Text`, `+ Rectangle`, `+ Circle`, `+ Diamond`, `+ Image`).
+2. Select elements to update text and colors.
+3. Drag elements on the canvas to position them.
+4. Enter prompt in Copilot tab only if you want AI-generated slides.
+5. (Optional) Upload an existing `.pptx` in Copilot tab to provide reference context.
+6. Click **Generate Deck** when needed.
 7. Save/load projects and export JSON.
 
 ## Example prompt
