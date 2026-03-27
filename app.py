@@ -28,6 +28,7 @@ class LLMRuntimeConfig(BaseModel):
     model: str = "llama3"
     temperature: float = 0.2
     max_tokens: int = 1800
+    timeout_seconds: float = 120.0
     use_mock: bool = False
 
 
@@ -63,6 +64,7 @@ def _get_llm(cfg: LLMRuntimeConfig):
             model=cfg.model,
             temperature=cfg.temperature,
             max_tokens=cfg.max_tokens,
+            timeout_seconds=cfg.timeout_seconds,
         )
     )
     ok, reason = client.health_check()
@@ -99,7 +101,14 @@ def generate(req: GenerateRequest):
         candidate = llm.generate_structured_json(system_prompt, user_prompt)
         deck = normalize_deck(candidate)
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=f"Failed to generate deck: {exc}") from exc
+        if isinstance(exc, TimeoutError):
+            detail = (
+                "Failed to generate deck: request timed out. "
+                "Increase timeout/model speed or reduce slide count/max tokens."
+            )
+        else:
+            detail = f"Failed to generate deck: {exc}"
+        raise HTTPException(status_code=500, detail=detail) from exc
 
     payload = deck.model_dump(by_alias=True)
     for slide in payload["slides"]:

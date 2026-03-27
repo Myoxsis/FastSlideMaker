@@ -7,24 +7,30 @@
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
-  <header>
-    <h1>Fast Slide Maker Studio</h1>
-    <p>PowerPoint-style deck workspace on the left, AI copilot on the right.</p>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Fast Slide Maker</p>
+      <h1>Presentation Studio + AI Copilot</h1>
+      <p class="subtitle">A polished PowerPoint-style workspace on the left with a dedicated copilot workspace on the right.</p>
+    </div>
+    <div class="topbar-actions">
+      <button id="generateBtn" class="btn-primary">Generate Deck</button>
+    </div>
   </header>
 
   <main class="workspace">
-    <section class="ppt-shell">
-      <aside class="slide-rail panel">
+    <section class="ppt-shell panel glass">
+      <aside class="slide-rail">
         <div class="rail-header">
-          <h2>Slides</h2>
-          <button id="generateBtn">Generate Deck</button>
+          <h2>Deck Navigator</h2>
+          <span class="chip">Slides</span>
         </div>
         <div id="slideTabs" class="slide-list"></div>
       </aside>
 
-      <section class="editor-stage panel">
+      <section class="editor-stage">
         <div class="stage-header">
-          <h2>Canvas</h2>
+          <h2>Live Canvas</h2>
           <div class="btns">
             <button id="regenerateBtn">Regenerate Slide</button>
             <button id="saveBtn">Save</button>
@@ -40,46 +46,50 @@
           <label>Summary <textarea id="summaryEdit" rows="3"></textarea></label>
           <label>Key Entities (comma-separated) <input id="entitiesEdit" /></label>
           <label>Relationships (one per line) <textarea id="relationshipsEdit" rows="3"></textarea></label>
-          <button id="applyEditBtn">Apply Edits</button>
+          <button id="applyEditBtn" class="btn-primary">Apply Edits</button>
         </section>
       </section>
     </section>
 
-    <aside class="copilot panel">
+    <aside class="copilot panel glass">
+      <div class="copilot-head">
+        <h2>AI Copilot</h2>
+        <p>Prompt, iterate, chat, and tune your model settings without leaving the workspace.</p>
+      </div>
       <div class="tab-header">
-        <button class="side-tab active" data-tab="chat">Chat</button>
+        <button class="side-tab active" data-tab="chat">Copilot</button>
         <button class="side-tab" data-tab="logs">Logs</button>
         <button class="side-tab" data-tab="settings">Settings</button>
       </div>
 
       <section id="tab-chat" class="tab-panel active">
-        <h2>LLM Copilot</h2>
-        <label>Prompt
-          <textarea id="promptInput" rows="3">Create a 6-slide deck explaining the order-to-cash process and the target IT solution architecture.</textarea>
+        <label>Deck Prompt
+          <textarea id="promptInput" rows="4">Create a 6-slide deck explaining the order-to-cash process and the target IT solution architecture.</textarea>
         </label>
         <div id="chatMessages" class="chat-messages"></div>
         <div class="chat-box">
           <textarea id="chatInput" rows="3" placeholder="Ask for narrative ideas, title rewrites, or process clarifications..."></textarea>
-          <button id="sendChatBtn">Send</button>
+          <button id="sendChatBtn" class="btn-primary">Send</button>
         </div>
       </section>
 
       <section id="tab-logs" class="tab-panel">
-        <h2>Exchange Log</h2>
-        <p class="hint">Includes user messages and responses from LLM/app events.</p>
+        <h3>Exchange Log</h3>
+        <p class="hint">User and assistant activity timeline.</p>
         <div id="logContainer" class="log-list"></div>
       </section>
 
       <section id="tab-settings" class="tab-panel">
-        <h2>LLM Settings</h2>
+        <h3>LLM Settings</h3>
         <label>Base URL <input id="baseUrlInput" value="http://localhost:11434" /></label>
         <label>Endpoint <input id="endpointInput" value="/api/chat" /></label>
         <label>Model <input id="modelInput" value="llama3" /></label>
         <label>Slide Count <input id="slideCountInput" type="number" min="3" max="20" value="6" /></label>
         <label>Temperature <input id="tempInput" type="number" min="0" max="1" step="0.1" value="0.2" /></label>
         <label>Max Tokens <input id="maxTokensInput" type="number" min="200" max="4000" value="1800" /></label>
+        <label>Timeout (seconds) <input id="timeoutInput" type="number" min="10" max="600" value="120" /></label>
         <label class="checkbox"><input id="mockInput" type="checkbox" /> Force Mock Mode</label>
-        <button id="saveSettingsBtn">Save Settings</button>
+        <button id="saveSettingsBtn" class="btn-primary">Save Settings</button>
         <p id="status" class="status">Ready.</p>
       </section>
     </aside>
