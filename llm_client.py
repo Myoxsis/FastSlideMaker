@@ -137,9 +137,36 @@ class OllamaClient:
     @staticmethod
     def _extract_text(data: dict[str, Any]) -> str:
         if "message" in data and isinstance(data["message"], dict):
-            return data["message"].get("content", "")
-        if "response" in data:
+            content = data["message"].get("content", "")
+            if isinstance(content, str):
+                return content
+
+        if "response" in data and isinstance(data["response"], str):
             return data["response"]
+
+        # OpenAI-compatible chat/completions shape.
+        choices = data.get("choices")
+        if isinstance(choices, list) and choices:
+            first = choices[0] if isinstance(choices[0], dict) else {}
+            message = first.get("message")
+            if isinstance(message, dict):
+                content = message.get("content", "")
+                if isinstance(content, str):
+                    return content
+                if isinstance(content, list):
+                    parts: list[str] = []
+                    for part in content:
+                        if isinstance(part, dict) and isinstance(part.get("text"), str):
+                            parts.append(part["text"])
+                    if parts:
+                        return "".join(parts)
+            text = first.get("text")
+            if isinstance(text, str):
+                return text
+
+        if isinstance(data.get("content"), str):
+            return data["content"]
+
         return "{}"
 
     @staticmethod
