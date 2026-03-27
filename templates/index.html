@@ -23,7 +23,10 @@
       <aside class="slide-rail">
         <div class="rail-header">
           <h2>Deck Navigator</h2>
-          <span class="chip">Slides</span>
+          <div class="rail-actions">
+            <span class="chip">Slides</span>
+            <button id="addSlideBtn" class="btn-primary">+ New Slide</button>
+          </div>
         </div>
         <div id="slideTabs" class="slide-list"></div>
       </aside>
@@ -32,6 +35,7 @@
         <div class="stage-header">
           <h2>Live Canvas</h2>
           <div class="btns">
+            <button id="editSlideBtn">Edit Current Slide</button>
             <button id="regenerateBtn">Regenerate Slide</button>
             <button id="saveBtn">Save</button>
             <button id="loadBtn">Load</button>
@@ -39,14 +43,17 @@
           </div>
         </div>
         <article id="slidePreview" class="slide"></article>
-        <section class="edit-form">
-          <h3>Quick Slide Edit</h3>
+        <section id="slideEditor" class="edit-form hidden">
+          <h3>Slide Editor</h3>
           <label>Title <input id="titleEdit" /></label>
           <label>Objective <textarea id="objectiveEdit" rows="2"></textarea></label>
           <label>Summary <textarea id="summaryEdit" rows="3"></textarea></label>
           <label>Key Entities (comma-separated) <input id="entitiesEdit" /></label>
           <label>Relationships (one per line) <textarea id="relationshipsEdit" rows="3"></textarea></label>
-          <button id="applyEditBtn" class="btn-primary">Apply Edits</button>
+          <div class="editor-actions">
+            <button id="cancelEditBtn">Close Editor</button>
+            <button id="applyEditBtn" class="btn-primary">Save Slide Changes</button>
+          </div>
         </section>
       </section>
     </section>
