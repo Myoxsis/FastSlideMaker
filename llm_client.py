@@ -60,21 +60,26 @@ class OllamaClient:
         if not ok:
             raise RuntimeError(reason)
 
-        with httpx.Client(timeout=self.config.timeout_seconds) as client:
-            resp = client.post(f"{self.config.base_url}/api/chat", json=self._chat_payload(message))
-            if resp.status_code == 404:
-                fallback_payload = {
-                    "model": self.config.model,
-                    "stream": False,
-                    "prompt": message,
-                    "options": {
-                        "temperature": self.config.temperature,
-                        "num_predict": self.config.max_tokens,
-                    },
-                }
-                resp = client.post(f"{self.config.base_url}/api/generate", json=fallback_payload)
-            resp.raise_for_status()
-            data = resp.json()
+        try:
+            with httpx.Client(timeout=self.config.timeout_seconds) as client:
+                resp = client.post(f"{self.config.base_url}/api/chat", json=self._chat_payload(message))
+                if resp.status_code == 404:
+                    fallback_payload = {
+                        "model": self.config.model,
+                        "stream": False,
+                        "prompt": message,
+                        "options": {
+                            "temperature": self.config.temperature,
+                            "num_predict": self.config.max_tokens,
+                        },
+                    }
+                    resp = client.post(f"{self.config.base_url}/api/generate", json=fallback_payload)
+                resp.raise_for_status()
+                data = resp.json()
+        except httpx.TimeoutException as exc:
+            raise TimeoutError(
+                f"LLM response exceeded timeout ({self.config.timeout_seconds:.0f}s)"
+            ) from exc
 
         return self._extract_text(data).strip()
 
@@ -108,18 +113,23 @@ class OllamaClient:
         }
         chat_payload["messages"] = messages
 
-        with httpx.Client(timeout=self.config.timeout_seconds) as client:
-            # Prefer /api/chat when available. Older Ollama builds may only expose /api/generate.
-            if self.config.endpoint == "/api/chat":
-                resp = client.post(f"{self.config.base_url}/api/chat", json=chat_payload)
-                if resp.status_code == 404:
+        try:
+            with httpx.Client(timeout=self.config.timeout_seconds) as client:
+                # Prefer /api/chat when available. Older Ollama builds may only expose /api/generate.
+                if self.config.endpoint == "/api/chat":
+                    resp = client.post(f"{self.config.base_url}/api/chat", json=chat_payload)
+                    if resp.status_code == 404:
+                        resp = client.post(f"{self.config.base_url}/api/generate", json=prompt_payload)
+                elif self.config.endpoint == "/api/generate":
                     resp = client.post(f"{self.config.base_url}/api/generate", json=prompt_payload)
-            elif self.config.endpoint == "/api/generate":
-                resp = client.post(f"{self.config.base_url}/api/generate", json=prompt_payload)
-            else:
-                resp = client.post(f"{self.config.base_url}{self.config.endpoint}", json=chat_payload)
-            resp.raise_for_status()
-            data = resp.json()
+                else:
+                    resp = client.post(f"{self.config.base_url}{self.config.endpoint}", json=chat_payload)
+                resp.raise_for_status()
+                data = resp.json()
+        except httpx.TimeoutException as exc:
+            raise TimeoutError(
+                f"LLM response exceeded timeout ({self.config.timeout_seconds:.0f}s)"
+            ) from exc
 
         raw = self._extract_text(data)
         return self._coerce_json(raw)

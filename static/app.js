@@ -25,6 +25,7 @@ function getConfig() {
     model: el("modelInput").value.trim() || "llama3",
     temperature: Number(el("tempInput").value || 0.2),
     max_tokens: Number(el("maxTokensInput").value || 1800),
+    timeout_seconds: Number(el("timeoutInput").value || 120),
     use_mock: el("mockInput").checked,
   };
 }
@@ -172,6 +173,7 @@ async function loadSettings() {
     el("modelInput").value = settings.model;
     el("tempInput").value = settings.temperature;
     el("maxTokensInput").value = settings.max_tokens;
+    el("timeoutInput").value = settings.timeout_seconds || 120;
     el("mockInput").checked = settings.use_mock;
   } catch (e) {
     addLog("app", `Could not load settings: ${e.message}`);
@@ -180,6 +182,7 @@ async function loadSettings() {
 
 el("generateBtn").onclick = async () => {
   try {
+    el("generateBtn").disabled = true;
     setStatus("Generating deck...");
     const config = getConfig();
     const result = await callApi("/api/generate", "POST", config);
@@ -189,6 +192,8 @@ el("generateBtn").onclick = async () => {
     setStatus(`Deck generated (${result.mode}).`);
   } catch (e) {
     setStatus(`Error: ${e.message}`);
+  } finally {
+    el("generateBtn").disabled = false;
   }
 };
 

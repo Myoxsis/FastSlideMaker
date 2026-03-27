@@ -1,140 +1,166 @@
 :root {
-  --bg: #f1f3f7;
-  --panel: #ffffff;
-  --line: #d4dbe7;
-  --text: #1f2a44;
-  --muted: #5f6c86;
-  --accent: #d84f4f;
+  --bg: #0d1324;
+  --bg-soft: #111a30;
+  --panel: rgba(255, 255, 255, 0.94);
+  --line: #d8dfec;
+  --text: #111827;
+  --muted: #5a6782;
+  --accent: #4263eb;
+  --accent-2: #7c3aed;
+  --success: #0f766e;
 }
 
 * { box-sizing: border-box; }
 body {
   margin: 0;
   font-family: Inter, Segoe UI, Arial, sans-serif;
-  background: var(--bg);
+  background: radial-gradient(circle at 15% 10%, #1f315f 0%, var(--bg) 45%), var(--bg);
   color: var(--text);
+  min-height: 100vh;
 }
 
-header {
-  padding: 10px 16px;
-  background: #fff;
-  border-bottom: 1px solid var(--line);
+.topbar {
+  margin: 16px;
+  padding: 18px 22px;
+  border-radius: 18px;
+  background: linear-gradient(120deg, rgba(66, 99, 235, 0.2), rgba(124, 58, 237, 0.18)), #fff;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
 }
-header h1 { margin: 0 0 2px 0; font-size: 20px; }
-header p { margin: 0; color: var(--muted); font-size: 13px; }
+.eyebrow { margin: 0; color: #3657d6; font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+.topbar h1 { margin: 4px 0; font-size: 27px; }
+.subtitle { margin: 0; color: var(--muted); font-size: 14px; }
 
 .workspace {
   display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 12px;
-  height: calc(100vh - 73px);
-  padding: 12px;
-}
-
-.ppt-shell {
-  display: grid;
-  grid-template-columns: 240px 1fr;
-  gap: 10px;
-  min-height: 0;
+  grid-template-columns: 1.8fr 1fr;
+  gap: 14px;
+  height: calc(100vh - 138px);
+  padding: 0 16px 16px;
 }
 
 .panel {
   background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 16px;
   overflow: auto;
 }
+.glass { box-shadow: 0 18px 32px rgba(6, 16, 44, 0.35); backdrop-filter: blur(5px); }
 
-.rail-header, .stage-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
+.ppt-shell {
+  display: grid;
+  grid-template-columns: 245px 1fr;
+  gap: 14px;
+  min-height: 0;
+  padding: 14px;
 }
 
+.rail-header, .stage-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+h2, h3 { margin: 0; }
+
+.slide-rail { border-right: 1px solid #e6ebf6; padding-right: 10px; }
+.chip { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: #edf2ff; color: #2a4ac9; }
 .slide-list { display: grid; gap: 8px; margin-top: 10px; }
 .slide-thumb {
   width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  border: 1px solid #e1e8f5;
+  border-radius: 12px;
   padding: 10px;
   text-align: left;
   background: #fff;
   display: grid;
-  grid-template-columns: 28px 1fr;
+  grid-template-columns: 30px 1fr;
   gap: 8px;
 }
-.slide-thumb.active { border-color: #5a79c8; background: #edf3ff; }
+.slide-thumb:hover { border-color: #c9d8ff; background: #f8faff; }
+.slide-thumb.active { border-color: #5576f0; background: #edf3ff; }
 .slide-index {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  background: #f0f4fb;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #eff3ff;
+  color: #2448c8;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  font-weight: 700;
 }
 
+.editor-stage { padding: 2px 4px 4px 2px; }
 .slide {
-  min-height: 400px;
-  background: #fff;
-  border: 1px solid #cfd8ea;
-  border-radius: 10px;
-  padding: 20px;
+  margin-top: 10px;
+  min-height: 420px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+  border: 1px solid #d8e1f3;
+  border-radius: 14px;
+  padding: 24px;
 }
-.slide h3 { margin: 0 0 8px; font-size: 26px; }
-.meta { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+.slide h3 { margin: 0 0 10px; font-size: 30px; color: #132041; }
+.meta { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.box { border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: #fbfcff; }
-.badge { display: inline-block; font-size: 11px; background: #eef2fa; border-radius: 999px; padding: 2px 8px; margin-right: 5px; }
-.process-row, .layer-row, .roadmap-row { display: flex; gap: 8px; margin-top: 10px; }
-.step, .layer, .mile { flex: 1; background: #f3f7ff; border: 1px solid #c6d6ff; border-radius: 8px; padding: 8px; text-align: center; }
+.box { border: 1px solid #e1e8f5; border-radius: 10px; padding: 10px; background: #fff; }
+.badge { display: inline-block; font-size: 11px; background: #eef2fa; border-radius: 999px; padding: 4px 9px; margin-right: 6px; }
+.process-row, .layer-row, .roadmap-row { display: flex; gap: 10px; margin-top: 10px; }
+.step, .layer, .mile { flex: 1; background: #f4f7ff; border: 1px solid #d2defb; border-radius: 10px; padding: 10px; text-align: center; }
 
-.edit-form { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
-.edit-form h3 { margin: 0 0 8px; font-size: 16px; }
+.edit-form { margin-top: 12px; border-top: 1px solid #e6ebf6; padding-top: 12px; }
+.edit-form h3 { margin-bottom: 8px; }
 
 label { display: block; font-size: 13px; color: var(--muted); }
 textarea, input {
   width: 100%;
-  border: 1px solid #c6d0e0;
-  border-radius: 8px;
-  padding: 8px;
+  border: 1px solid #d1daec;
+  border-radius: 10px;
+  padding: 9px;
   margin: 4px 0 10px;
   font-size: 14px;
+  background: #fff;
 }
+textarea:focus, input:focus { outline: 2px solid #dbe5ff; border-color: #88a1ee; }
 
 button {
   border: none;
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: var(--accent);
-  color: white;
+  border-radius: 10px;
+  padding: 9px 11px;
+  background: #e9efff;
+  color: #27469f;
   cursor: pointer;
+  font-weight: 600;
 }
-button:hover { opacity: .92; }
+button:hover { filter: brightness(0.98); }
+.btn-primary {
+  background: linear-gradient(110deg, var(--accent), var(--accent-2));
+  color: #fff;
+}
 
 .btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .checkbox { display: flex; gap: 8px; align-items: center; }
 .hint { color: var(--muted); font-size: 12px; }
-.status { font-size: 12px; background: #eef2fc; padding: 8px; border-radius: 8px; }
+.status { font-size: 12px; background: #ecf8f7; color: var(--success); padding: 8px; border-radius: 8px; }
 
-.copilot { display: flex; flex-direction: column; }
-.tab-header { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.side-tab { background: #e7edf8; color: #2b3e63; }
-.side-tab.active { background: #2b6de8; color: #fff; }
-.tab-panel { display: none; margin-top: 10px; }
+.copilot {
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+}
+.copilot-head p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+.tab-header { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 12px; }
+.side-tab { background: #eef1fb; color: #2b3e63; }
+.side-tab.active { background: #253f8a; color: #fff; }
+.tab-panel { display: none; margin-top: 12px; }
 .tab-panel.active { display: block; }
-.tab-panel h2 { margin: 0 0 8px; font-size: 18px; }
 
 .chat-messages {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px;
+  border: 1px solid #dbe3f4;
+  border-radius: 10px;
+  padding: 10px;
   min-height: 230px;
   max-height: 300px;
   overflow: auto;
-  background: #fbfcff;
+  background: #fff;
   margin-bottom: 8px;
 }
 .msg { margin-bottom: 8px; font-size: 13px; line-height: 1.4; }
@@ -142,13 +168,13 @@ button:hover { opacity: .92; }
 .msg.llm b { color: #0d6b48; }
 
 .log-list {
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 1px solid #dbe3f4;
+  border-radius: 10px;
   padding: 8px;
   min-height: 360px;
   max-height: 520px;
   overflow: auto;
-  background: #fbfcff;
+  background: #fff;
 }
 .log-item { font-size: 12px; margin-bottom: 6px; }
 .log-item span { color: var(--muted); }
@@ -156,4 +182,5 @@ button:hover { opacity: .92; }
 @media (max-width: 1200px) {
   .workspace { grid-template-columns: 1fr; height: auto; }
   .ppt-shell { grid-template-columns: 1fr; }
+  .slide-rail { border-right: none; border-bottom: 1px solid #e6ebf6; padding-right: 0; padding-bottom: 10px; }
 }
