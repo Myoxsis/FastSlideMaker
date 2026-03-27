@@ -52,7 +52,7 @@ class OllamaClient:
 
         messages = self._build_messages(system_prompt, user_prompt)
 
-        payload = {
+        chat_payload = {
             "model": self.config.model,
             "stream": False,
             "options": {
@@ -62,13 +62,28 @@ class OllamaClient:
             "format": "json",
         }
 
-        if self.config.endpoint == "/api/chat":
-            payload["messages"] = messages
-        else:
-            payload["prompt"] = f"SYSTEM:\n{system_prompt}\n\nUSER:\n{user_prompt}"
+        prompt_payload = {
+            "model": self.config.model,
+            "stream": False,
+            "options": {
+                "temperature": self.config.temperature,
+                "num_predict": self.config.max_tokens,
+            },
+            "format": "json",
+            "prompt": f"SYSTEM:\n{system_prompt}\n\nUSER:\n{user_prompt}",
+        }
+        chat_payload["messages"] = messages
 
         with httpx.Client(timeout=self.config.timeout_seconds) as client:
-            resp = client.post(f"{self.config.base_url}{self.config.endpoint}", json=payload)
+            # Prefer /api/chat when available. Older Ollama builds may only expose /api/generate.
+            if self.config.endpoint == "/api/chat":
+                resp = client.post(f"{self.config.base_url}/api/chat", json=chat_payload)
+                if resp.status_code == 404:
+                    resp = client.post(f"{self.config.base_url}/api/generate", json=prompt_payload)
+            elif self.config.endpoint == "/api/generate":
+                resp = client.post(f"{self.config.base_url}/api/generate", json=prompt_payload)
+            else:
+                resp = client.post(f"{self.config.base_url}{self.config.endpoint}", json=chat_payload)
             resp.raise_for_status()
             data = resp.json()
 
