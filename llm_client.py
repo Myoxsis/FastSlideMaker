@@ -44,6 +44,40 @@ class OllamaClient:
             {"role": "user", "content": user_prompt},
         ]
 
+    def _chat_payload(self, message: str) -> dict[str, Any]:
+        return {
+            "model": self.config.model,
+            "stream": False,
+            "options": {
+                "temperature": self.config.temperature,
+                "num_predict": self.config.max_tokens,
+            },
+            "messages": [{"role": "user", "content": message}],
+        }
+
+    def chat(self, message: str) -> str:
+        ok, reason = self.health_check()
+        if not ok:
+            raise RuntimeError(reason)
+
+        with httpx.Client(timeout=self.config.timeout_seconds) as client:
+            resp = client.post(f"{self.config.base_url}/api/chat", json=self._chat_payload(message))
+            if resp.status_code == 404:
+                fallback_payload = {
+                    "model": self.config.model,
+                    "stream": False,
+                    "prompt": message,
+                    "options": {
+                        "temperature": self.config.temperature,
+                        "num_predict": self.config.max_tokens,
+                    },
+                }
+                resp = client.post(f"{self.config.base_url}/api/generate", json=fallback_payload)
+            resp.raise_for_status()
+            data = resp.json()
+
+        return self._extract_text(data).strip()
+
     def generate_structured_json(self, system_prompt: str, user_prompt: str) -> dict[str, Any]:
         """Generate JSON from Ollama and parse response safely."""
         ok, reason = self.health_check()
@@ -109,6 +143,9 @@ class OllamaClient:
 
 class MockLLMClient:
     """Offline fallback used when Ollama is not running."""
+
+    def chat(self, message: str) -> str:
+        return f"[Mock LLM] Received: {message}\n\nTip: Start Ollama to get real model responses."
 
     def generate_structured_json(self, system_prompt: str, user_prompt: str) -> dict[str, Any]:
         _ = system_prompt
