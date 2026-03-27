@@ -1,0 +1,33 @@
+{
+  "presentation": {
+    "title": "Order-to-Cash Process and Target IT Architecture",
+    "theme": "consulting",
+    "description": "Create a 6-slide deck explaining the order-to-cash process and the target IT solution architecture"
+  },
+  "slides": [
+    {
+      "id": "s1",
+      "title": "Executive Summary",
+      "objective": "Align on pain points and decisions",
+      "slide_type": "executive summary",
+      "audience": "SteerCo",
+      "summary": "Top issues and recommendation",
+      "audience_takeaway": "Approve target-state design",
+      "key_entities": ["Sales", "Finance", "IT"],
+      "relationships": ["Sales to Billing handoff delays"],
+      "priority_of_information": ["decision", "impact"],
+      "content_blocks": [
+        {"type": "headline", "text": "Current process is fragmented"}
+      ],
+      "diagram_data": {
+        "nodes": [],
+        "edges": [],
+        "lanes": [],
+        "layers": [],
+        "milestones": [],
+        "annotations": []
+      },
+      "layout_hints": {"density": "low", "emphasis": "headline"}
+    }
+  ]
+}

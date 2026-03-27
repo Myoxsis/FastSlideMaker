@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fast Slide Maker</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Fast Slide Maker</h1>
+    <p>Process + IT solution design slide specification generator (offline with Ollama/mock fallback).</p>
+  </header>
+
+  <main class="shell">
+    <section class="panel left">
+      <h2>Prompt Input</h2>
+      <textarea id="promptInput" rows="8">Create a 6-slide deck explaining the order-to-cash process and the target IT solution architecture.</textarea>
+      <div class="controls">
+        <label>Model <input id="modelInput" value="llama3" /></label>
+        <label>Slides <input id="slideCountInput" type="number" min="3" max="12" value="6" /></label>
+        <label>Temperature <input id="tempInput" type="number" min="0" max="1" step="0.1" value="0.2" /></label>
+        <label>Max Tokens <input id="maxTokensInput" type="number" min="300" max="4000" value="1800" /></label>
+        <label class="checkbox"><input id="mockInput" type="checkbox" /> Force Mock Mode</label>
+      </div>
+      <div class="btns">
+        <button id="generateBtn">Generate Deck</button>
+        <button id="regenerateBtn">Regenerate Slide</button>
+        <button id="saveBtn">Save Project</button>
+        <button id="loadBtn">Load Project</button>
+        <button id="exportBtn">Export JSON</button>
+      </div>
+      <p class="hint">Example prompts: order-to-cash redesign, procure-to-pay transformation, CRM-to-ERP integration roadmap.</p>
+      <p id="status" class="status">Ready.</p>
+    </section>
+
+    <section class="panel center">
+      <h2>Slide Preview</h2>
+      <div id="slideTabs" class="tabs"></div>
+      <article id="slidePreview" class="slide"></article>
+    </section>
+
+    <section class="panel right">
+      <h2>Structured Editor</h2>
+      <label>Title <input id="titleEdit" /></label>
+      <label>Objective <textarea id="objectiveEdit" rows="3"></textarea></label>
+      <label>Summary <textarea id="summaryEdit" rows="4"></textarea></label>
+      <label>Key Entities (comma-separated) <input id="entitiesEdit" /></label>
+      <label>Relationships (one per line) <textarea id="relationshipsEdit" rows="4"></textarea></label>
+      <button id="applyEditBtn">Apply Edits</button>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
