@@ -66,6 +66,10 @@
         <label>Deck Prompt
           <textarea id="promptInput" rows="4">Create a 6-slide deck explaining the order-to-cash process and the target IT solution architecture.</textarea>
         </label>
+        <label>Reference PowerPoint (.pptx)
+          <input id="pptxInput" type="file" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" />
+        </label>
+        <p id="pptxStatus" class="hint">Optional: upload an existing deck to provide context for generation.</p>
         <div id="chatMessages" class="chat-messages"></div>
         <div class="chat-box">
           <textarea id="chatInput" rows="3" placeholder="Ask for narrative ideas, title rewrites, or process clarifications..."></textarea>

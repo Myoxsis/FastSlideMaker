@@ -2,6 +2,8 @@ let state = {
   deck: null,
   selected: 0,
   logs: [],
+  referenceContext: "",
+  referenceFilename: "",
 };
 
 const el = (id) => document.getElementById(id);
@@ -27,6 +29,7 @@ function getConfig() {
     max_tokens: Number(el("maxTokensInput").value || 1800),
     timeout_seconds: Number(el("timeoutInput").value || 120),
     use_mock: el("mockInput").checked,
+    reference_context: state.referenceContext,
   };
 }
 
@@ -38,10 +41,11 @@ function configOnly() {
 }
 
 async function callApi(url, method = "GET", body = null) {
+  const isForm = body instanceof FormData;
   const res = await fetch(url, {
     method,
-    headers: { "Content-Type": "application/json" },
-    body: body ? JSON.stringify(body) : null,
+    headers: isForm ? undefined : { "Content-Type": "application/json" },
+    body: body ? (isForm ? body : JSON.stringify(body)) : null,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Unknown error" }));
@@ -279,6 +283,28 @@ el("saveSettingsBtn").onclick = async () => {
 document.querySelectorAll(".side-tab").forEach((btn) => {
   btn.onclick = () => setActiveTab(btn.dataset.tab);
 });
+
+el("pptxInput").onchange = async (event) => {
+  const [file] = event.target.files || [];
+  if (!file) return;
+
+  const form = new FormData();
+  form.append("file", file);
+  el("pptxStatus").textContent = "Extracting context from PowerPoint...";
+  try {
+    const result = await callApi("/api/context/powerpoint", "POST", form);
+    state.referenceContext = result.reference_context;
+    state.referenceFilename = result.filename;
+    const msg = `Loaded ${result.filename} (${result.slide_count} slides, ${result.slides_with_text} with text).`;
+    el("pptxStatus").textContent = `${msg} This context will be considered during generation.`;
+    addLog("app", msg);
+  } catch (e) {
+    state.referenceContext = "";
+    state.referenceFilename = "";
+    el("pptxStatus").textContent = `Could not parse file: ${e.message}`;
+    addLog("app", `PowerPoint upload failed: ${e.message}`);
+  }
+};
 
 loadSettings();
 renderAll();
