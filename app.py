@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -35,6 +35,7 @@ class LLMRuntimeConfig(BaseModel):
 class GenerateRequest(LLMRuntimeConfig):
     prompt: str
     slide_count: int = 6
+    reference_context: str = ""
 
 
 class RegenerateSlideRequest(LLMRuntimeConfig):
@@ -42,10 +43,12 @@ class RegenerateSlideRequest(LLMRuntimeConfig):
     deck: dict[str, Any]
     slide_id: str
     max_tokens: int = 800
+    reference_context: str = ""
 
 
 class ChatRequest(LLMRuntimeConfig):
     message: str
+    reference_context: str = ""
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -77,6 +80,18 @@ def _default_settings() -> dict[str, Any]:
     return LLMRuntimeConfig().model_dump()
 
 
+def _append_reference_context(prompt: str, reference_context: str) -> str:
+    context = reference_context.strip()
+    if not context:
+        return prompt
+    return (
+        f"{prompt}\n\n"
+        "Reference context from an existing PowerPoint deck. "
+        "Use this only as optional context, prioritize the user request:\n"
+        f"{context}"
+    )
+
+
 @app.get("/api/settings")
 def get_settings():
     if not SETTINGS_PATH.exists():
@@ -96,6 +111,7 @@ def generate(req: GenerateRequest):
     llm, mode = _get_llm(req)
     system_prompt = build_system_prompt()
     user_prompt = build_user_prompt(req.prompt, req.slide_count)
+    user_prompt = _append_reference_context(user_prompt, req.reference_context)
 
     try:
         candidate = llm.generate_structured_json(system_prompt, user_prompt)
@@ -133,6 +149,7 @@ def regenerate_slide(req: RegenerateSlideRequest):
         + "\nRegenerate ONLY one slide with matching id and compatible narrative context.\n"
         + context
     )
+    user_prompt = _append_reference_context(user_prompt, req.reference_context)
 
     try:
         candidate = llm.generate_structured_json(system_prompt, user_prompt)
@@ -151,10 +168,59 @@ def regenerate_slide(req: RegenerateSlideRequest):
 def chat(req: ChatRequest):
     llm, mode = _get_llm(req)
     try:
-        reply = llm.chat(req.message)
+        message = _append_reference_context(req.message, req.reference_context)
+        reply = llm.chat(message)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Failed to chat: {exc}") from exc
     return {"mode": mode, "reply": reply}
+
+
+@app.post("/api/context/powerpoint")
+async def extract_powerpoint_context(file: UploadFile = File(...)):
+    if not file.filename or not file.filename.lower().endswith(".pptx"):
+        raise HTTPException(status_code=400, detail="Only .pptx files are supported")
+
+    try:
+        from pptx import Presentation
+    except ImportError as exc:  # pragma: no cover
+        raise HTTPException(status_code=500, detail="python-pptx is not installed") from exc
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    from io import BytesIO
+
+    try:
+        presentation = Presentation(BytesIO(raw))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"Failed to parse PowerPoint file: {exc}") from exc
+
+    slide_summaries: list[str] = []
+    for index, slide in enumerate(presentation.slides, start=1):
+        text_parts: list[str] = []
+        for shape in slide.shapes:
+            text = getattr(shape, "text", "")
+            cleaned = text.strip()
+            if cleaned:
+                text_parts.append(cleaned)
+        if text_parts:
+            combined = " | ".join(text_parts)
+            slide_summaries.append(f"Slide {index}: {combined}")
+
+    if not slide_summaries:
+        raise HTTPException(status_code=400, detail="No extractable text found in PowerPoint")
+
+    joined = "\n".join(slide_summaries)
+    if len(joined) > 8000:
+        joined = f"{joined[:8000]}\n... (truncated)"
+
+    return {
+        "filename": file.filename,
+        "slide_count": len(presentation.slides),
+        "slides_with_text": len(slide_summaries),
+        "reference_context": joined,
+    }
 
 
 @app.post("/api/save/{project_name}")

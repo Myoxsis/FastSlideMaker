@@ -9,6 +9,7 @@ Local web app that generates consulting-style PowerPoint slide specifications fo
 - Validates/normalizes slide schema before rendering.
 - Uses deterministic layout templates for predictable visual quality.
 - Supports editing + single-slide regeneration in-browser.
+- Can ingest an existing `.pptx` deck as optional reference context for the LLM.
 - Works offline with **Ollama**, and falls back to a mock generator if Ollama is unavailable.
 
 ## Tech stack
@@ -58,11 +59,12 @@ Open: `http://127.0.0.1:8000`
 ## Usage flow
 
 1. Enter prompt in left panel.
-2. Click **Generate Deck**.
-3. Review slides in center panel.
-4. Edit structured fields in right panel.
-5. Click **Regenerate Slide** for selected slide.
-6. Save/load projects and export JSON.
+2. (Optional) Upload an existing `.pptx` in Copilot tab to provide reference context.
+3. Click **Generate Deck**.
+4. Review slides in center panel.
+5. Edit structured fields in right panel.
+6. Click **Regenerate Slide** for selected slide.
+7. Save/load projects and export JSON.
 
 ## Example prompt
 
