@@ -11,7 +11,7 @@
     <div>
       <p class="eyebrow">Fast Slide Maker</p>
       <h1>Simple Slide Maker</h1>
-      <p class="subtitle">A lightweight PowerPoint-like workspace with simple editing and AI assist.</p>
+      <p class="subtitle">Build slides manually first (text, images, forms, colors, shapes). AI Copilot stays optional.</p>
     </div>
     <div class="topbar-actions">
       <button id="generateBtn" class="btn-primary">Generate Deck</button>
@@ -35,6 +35,11 @@
         <div class="stage-header">
           <h2>Slide Canvas</h2>
           <div class="btns">
+            <button id="addTextBtn">+ Text</button>
+            <button id="addRectBtn">+ Rectangle</button>
+            <button id="addCircleBtn">+ Circle</button>
+            <button id="addDiamondBtn">+ Diamond</button>
+            <button id="addImageBtn">+ Image</button>
             <button id="editSlideBtn">Edit Current Slide</button>
             <button id="regenerateBtn">Regenerate Slide</button>
             <button id="saveBtn">Save</button>
@@ -43,6 +48,19 @@
           </div>
         </div>
         <article id="slidePreview" class="slide"></article>
+        <input id="imageUploadInput" type="file" accept="image/*" class="hidden" />
+        <section class="shape-editor">
+          <h3>Selected Element</h3>
+          <label>Text
+            <input id="shapeTextInput" placeholder="Edit text or leave blank for shape-only element" />
+          </label>
+          <div class="shape-grid">
+            <label>Fill Color <input id="shapeFillInput" type="color" value="#dbeafe" /></label>
+            <label>Text Color <input id="shapeTextColorInput" type="color" value="#111827" /></label>
+            <label>Border Color <input id="shapeBorderInput" type="color" value="#93c5fd" /></label>
+          </div>
+          <p class="hint">Tip: click an element, then drag it inside the slide to position it.</p>
+        </section>
         <section id="slideEditor" class="edit-form hidden">
           <h3>Slide Editor</h3>
           <label>Title <input id="titleEdit" /></label>
