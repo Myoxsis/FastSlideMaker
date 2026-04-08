@@ -1,4 +1,4 @@
-"""Deck generation service with Ollama + mock fallback support."""
+"""Deck generation service with Ollama detection + deterministic mock mode."""
 
 from __future__ import annotations
 
@@ -7,7 +7,8 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
-from app.models.schemas import Deck, DeckRequest, Slide
+from app.models.schemas import Deck, DeckRequest
+from app.services.mock_mode import build_mock_deck
 
 
 class GenerationService:
@@ -20,13 +21,15 @@ class GenerationService:
             return False
 
     async def generate(self, payload: DeckRequest) -> Deck:
-        if await self.check_ollama():
+        ollama_available = await self.check_ollama()
+
+        if ollama_available:
             deck = await self._generate_with_ollama(payload)
             if deck:
                 return deck
 
         if settings.enable_mock_mode:
-            return self._generate_mock(payload)
+            return build_mock_deck(payload, ollama_available=ollama_available)
 
         raise RuntimeError("Ollama is unavailable and mock mode is disabled.")
 
@@ -61,23 +64,3 @@ class GenerationService:
             return None
 
         return None
-
-    def _generate_mock(self, payload: DeckRequest) -> Deck:
-        slides = [
-            Slide(
-                title=f"{payload.topic} — Slide {index}",
-                bullets=[
-                    f"Key point {index}.1 for {payload.audience}",
-                    f"Key point {index}.2 with {payload.tone.lower()} tone",
-                    f"Action item {index}.3",
-                ],
-                notes="Generated in mock mode because Ollama is unavailable.",
-            )
-            for index in range(1, payload.slide_count + 1)
-        ]
-        return Deck(
-            title=f"{payload.topic} Overview",
-            theme="clean-blue",
-            slides=slides,
-            metadata={"mode": "mock", "model": settings.ollama_model},
-        )

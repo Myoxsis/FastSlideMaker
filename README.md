@@ -12,6 +12,7 @@ Fast Slide Maker is a slide-generation agent scaffold with a FastAPI backend and
   - `export`
 - Ollama configuration module with environment overrides
 - Mock mode fallback when Ollama is unavailable
+- Deterministic mock scenarios with canned prompts and sample JSON outputs
 - Static frontend and Jinja template
 - Sample JSON request/response files
 - Placeholder unit/integration test structure
@@ -38,6 +39,12 @@ OLLAMA_TOP_P=0.9
 OLLAMA_MAX_TOKENS=1200
 ENABLE_MOCK_MODE=true
 REQUEST_TIMEOUT_SECONDS=20
+```
+
+Mock mode examples endpoint:
+
+```bash
+curl http://127.0.0.1:8000/api/mock-mode/examples
 ```
 
 ### 3) Run the app
