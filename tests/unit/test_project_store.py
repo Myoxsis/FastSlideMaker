@@ -57,3 +57,16 @@ def test_export_pptx_creates_file(tmp_path: Path) -> None:
     assert output.exists()
     assert output.suffix == ".pptx"
     assert output.stat().st_size > 0
+
+
+def test_load_project_raises_for_invalid_json(tmp_path: Path) -> None:
+    store = ProjectStore(
+        projects_dir=tmp_path / "projects",
+        samples_dir=tmp_path / "samples",
+        exports_dir=tmp_path / "exports",
+    )
+    project_id = "broken"
+    (tmp_path / "projects" / f"{project_id}.json").write_text("{not valid", encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        store.load_project(project_id)

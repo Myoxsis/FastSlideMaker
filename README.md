@@ -1,21 +1,14 @@
 # Fast Slide Maker
 
-Fast Slide Maker is a slide-generation agent scaffold with a FastAPI backend and a lightweight HTML/CSS/JS frontend.
+Fast Slide Maker is a lightweight FastAPI app for generating, editing, and exporting semantic slide decks.
 
-## What is included
+## Reliability-focused behavior
 
-- Modular Python package layout under `app/`
-- Pipeline stages with clear boundaries:
-  - `generation` (LLM or mock)
-  - `validation`
-  - `rendering`
-  - `export`
-- Ollama configuration module with environment overrides
-- Mock mode fallback when Ollama is unavailable
-- Deterministic mock scenarios with canned prompts and sample JSON outputs
-- Static frontend and Jinja template
-- Sample JSON request/response files
-- Placeholder unit/integration test structure
+- Startup boot sequence wires core services and validates mock prompt/template consistency.
+- LLM generation supports graceful fallback to deterministic mock mode.
+- JSON parsing is validated for model output and project files.
+- Export writes deterministic artifacts under `artifacts/`.
+- Frontend surfaces save/load/export failures instead of silently ignoring them.
 
 ## Quickstart
 
@@ -27,9 +20,9 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2) Configure environment
+### 2) Configure environment (optional)
 
-Optional `.env` file:
+Create `.env`:
 
 ```env
 OLLAMA_HOST=http://localhost:11434
@@ -41,42 +34,53 @@ ENABLE_MOCK_MODE=true
 REQUEST_TIMEOUT_SECONDS=20
 ```
 
-Mock mode examples endpoint:
-
-```bash
-curl http://127.0.0.1:8000/api/mock-mode/examples
-```
-
 ### 3) Run the app
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-Open: http://127.0.0.1:8000
+Open http://127.0.0.1:8000.
 
-### 4) Run tests
+### 4) Verify health + sample prompts
 
 ```bash
-pytest
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/api/mock-mode/examples
 ```
+
+### 5) Run tests
+
+```bash
+pytest -q
+```
+
+## Practical flows to verify
+
+### App boot sequence
+- Start the server and check `/health` returns `"status": "ok"`.
+- Confirm startup created `generation_service`, `project_store`, and `ollama_available` app state (covered by tests).
+
+### Export path
+- Save a project in the UI.
+- Export JSON/PPTX from the header buttons.
+- Confirm files are downloaded and JSON artifacts appear in `artifacts/`.
+
+### Single-slide regeneration
+- Unit tests cover `SlideGenerator.regenerate_semantic_slide` end-to-end for one-slide regeneration with normalization and fallback behavior.
 
 ## Project layout
 
 ```text
 app/
-  api/routes.py
-  core/config.py
-  core/startup.py
-  models/schemas.py
-  services/generation.py
-  services/validation.py
-  services/rendering.py
-  services/export.py
+  api/
+  core/
+  models/
+  services/
+  utils/json_utils.py
+project_store.py
 templates/index.html
-static/css/styles.css
 static/js/app.js
-samples/*.json
-tests/unit/*.py
-tests/integration/*.py
+samples/
+tests/
 ```

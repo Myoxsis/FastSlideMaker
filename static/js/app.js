@@ -14,6 +14,33 @@ const exportJsonButton = document.getElementById("export-json");
 const exportPptxButton = document.getElementById("export-pptx");
 const projectNameInput = document.getElementById("project-name");
 const projectGalleryList = document.getElementById("project-gallery-list");
+let statusTimeout = null;
+
+function setStatus(message, isError = false) {
+  if (!message) return;
+  clearTimeout(statusTimeout);
+  slideTitleLabel.textContent = message;
+  slideTitleLabel.style.color = isError ? "#b42318" : "";
+  statusTimeout = setTimeout(() => {
+    const slide = getSelectedSlide();
+    slideTitleLabel.textContent = slide ? `${slide.order}. ${slide.title}` : "";
+    slideTitleLabel.style.color = "";
+  }, 2500);
+}
+
+async function parseJsonResponse(response) {
+  if (!response.ok) {
+    let detail = `${response.status} ${response.statusText}`;
+    try {
+      const payload = await response.json();
+      detail = payload.detail || detail;
+    } catch (_error) {
+      // Non-JSON error body.
+    }
+    throw new Error(detail);
+  }
+  return response.json();
+}
 
 function escapeHtml(value) {
   return String(value)
@@ -289,18 +316,26 @@ function persistEdit(element) {
 }
 
 async function loadDeck() {
-  const response = await fetch("/api/semantic-deck");
-  appState.deck = await response.json();
-  appState.selectedSlideId = appState.deck.slide_order[0];
-  projectNameInput.value = appState.deck.metadata?.title || "";
-  refreshUi();
+  try {
+    const response = await fetch("/api/semantic-deck");
+    appState.deck = await parseJsonResponse(response);
+    appState.selectedSlideId = appState.deck.slide_order[0];
+    projectNameInput.value = appState.deck.metadata?.title || "";
+    refreshUi();
+  } catch (error) {
+    setStatus(`Failed to load deck: ${error.message}`, true);
+  }
 }
 
 async function loadProjects() {
-  const response = await fetch("/api/projects");
-  const payload = await response.json();
-  appState.projects = payload.projects || [];
-  refreshUi();
+  try {
+    const response = await fetch("/api/projects");
+    const payload = await parseJsonResponse(response);
+    appState.projects = payload.projects || [];
+    refreshUi();
+  } catch (error) {
+    setStatus(`Failed to load projects: ${error.message}`, true);
+  }
 }
 
 async function saveDeck() {
@@ -310,29 +345,37 @@ async function saveDeck() {
   saveButton.disabled = true;
   saveButton.textContent = "Saving...";
 
-  const response = await fetch("/api/projects", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, deck: appState.deck }),
-  });
+  try {
+    const response = await fetch("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, deck: appState.deck }),
+    });
 
-  const project = await response.json();
-  appState.selectedProjectId = project.project_id;
-  saveButton.disabled = false;
-  saveButton.textContent = "Save Project";
-  await loadProjects();
+    const project = await parseJsonResponse(response);
+    appState.selectedProjectId = project.project_id;
+    await loadProjects();
+    setStatus("Project saved.");
+  } catch (error) {
+    setStatus(`Save failed: ${error.message}`, true);
+  } finally {
+    saveButton.disabled = false;
+    saveButton.textContent = "Save Project";
+  }
 }
 
 async function loadProject(projectId) {
-  const response = await fetch(`/api/projects/${projectId}`);
-  if (!response.ok) return;
-
-  const payload = await response.json();
-  appState.deck = payload.deck;
-  appState.selectedSlideId = appState.deck.slide_order[0];
-  appState.selectedProjectId = payload.project_id;
-  projectNameInput.value = payload.name || "";
-  refreshUi();
+  try {
+    const response = await fetch(`/api/projects/${projectId}`);
+    const payload = await parseJsonResponse(response);
+    appState.deck = payload.deck;
+    appState.selectedSlideId = appState.deck.slide_order[0];
+    appState.selectedProjectId = payload.project_id;
+    projectNameInput.value = payload.name || "";
+    refreshUi();
+  } catch (error) {
+    setStatus(`Load failed: ${error.message}`, true);
+  }
 }
 
 async function downloadExport(type) {
@@ -342,18 +385,25 @@ async function downloadExport(type) {
 
   if (!appState.selectedProjectId) return;
 
-  const response = await fetch(`/api/projects/${appState.selectedProjectId}/export/${type}`);
-  if (!response.ok) return;
+  try {
+    const response = await fetch(`/api/projects/${appState.selectedProjectId}/export/${type}`);
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}`);
+    }
 
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = type === "json" ? `${appState.selectedProjectId}.json` : `${appState.selectedProjectId}.pptx`;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = type === "json" ? `${appState.selectedProjectId}.json` : `${appState.selectedProjectId}.pptx`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setStatus(`Exported ${type.toUpperCase()}.`);
+  } catch (error) {
+    setStatus(`Export failed: ${error.message}`, true);
+  }
 }
 
 deckList.addEventListener("click", (event) => {

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import Any
 
 from pydantic import ValidationError
@@ -33,6 +32,7 @@ from app.models.schemas import (
 )
 from app.services.deck_planner import SlidePlanItem
 from app.services.llm_client import OllamaLLMClient
+from app.utils.json_utils import extract_json_object
 
 
 class SlideGenerator:
@@ -133,23 +133,7 @@ class SlideGenerator:
         return repaired_parsed
 
     def _parse_json(self, payload: str) -> dict[str, Any] | None:
-        cleaned = payload.strip()
-        if cleaned.startswith("```"):
-            cleaned = re.sub(r"^```(?:json)?\\s*", "", cleaned)
-            cleaned = re.sub(r"\\s*```$", "", cleaned)
-        try:
-            parsed = json.loads(cleaned)
-            return parsed if isinstance(parsed, dict) else None
-        except json.JSONDecodeError:
-            start = cleaned.find("{")
-            end = cleaned.rfind("}")
-            if start >= 0 and end > start:
-                try:
-                    parsed = json.loads(cleaned[start : end + 1])
-                    return parsed if isinstance(parsed, dict) else None
-                except json.JSONDecodeError:
-                    return None
-            return None
+        return extract_json_object(payload)
 
     def _extract_slide_payload(
         self,

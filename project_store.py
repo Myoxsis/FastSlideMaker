@@ -69,8 +69,11 @@ class ProjectStore:
 
     def load_project(self, project_id: str) -> dict:
         path = self._find_project_file(project_id)
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        payload["deck"] = SemanticPresentation.model_validate(payload["deck"]).normalized().model_dump(mode="json")
+        payload = self._read_json(path)
+        deck_payload = payload.get("deck")
+        if not isinstance(deck_payload, dict):
+            raise ValueError(f"Project '{project_id}' has invalid deck payload.")
+        payload["deck"] = SemanticPresentation.model_validate(deck_payload).normalized().model_dump(mode="json")
         return payload
 
     def export_project_json(self, project_id: str) -> Path:
@@ -101,11 +104,21 @@ class ProjectStore:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
+    @staticmethod
+    def _read_json(path: Path) -> dict:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Project file '{path.name}' is not valid JSON.") from exc
+        if not isinstance(payload, dict):
+            raise ValueError(f"Project file '{path.name}' must contain a JSON object.")
+        return payload
+
     def _scan_directory(self, directory: Path, *, source: str) -> list[ProjectIndexItem]:
         projects: list[ProjectIndexItem] = []
         for file in directory.glob("*.json"):
             try:
-                payload = json.loads(file.read_text(encoding="utf-8"))
+                payload = self._read_json(file)
                 item = ProjectIndexItem(
                     project_id=payload["project_id"],
                     name=payload.get("name", "Untitled Project"),
@@ -114,6 +127,6 @@ class ProjectStore:
                     source=source,
                 )
                 projects.append(item)
-            except (json.JSONDecodeError, KeyError):
+            except (ValueError, KeyError):
                 continue
         return projects

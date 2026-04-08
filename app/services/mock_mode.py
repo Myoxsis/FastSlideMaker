@@ -219,6 +219,21 @@ DECK_TEMPLATES: dict[str, dict[str, object]] = {
 }
 
 
+def validate_mock_assets() -> None:
+    """Ensure sample prompts and canned outputs stay in sync."""
+    prompt_ids = {item.get("id") for item in CANNED_SAMPLE_PROMPTS}
+    template_ids = set(DECK_TEMPLATES.keys())
+
+    missing_templates = prompt_ids - template_ids
+    missing_prompts = template_ids - prompt_ids
+    if missing_templates or missing_prompts:
+        raise ValueError(
+            "Mock prompts/templates are inconsistent. "
+            f"Missing templates for: {sorted(missing_templates)}; "
+            f"Missing prompts for: {sorted(missing_prompts)}."
+        )
+
+
 def select_mock_scenario(topic: str) -> str:
     normalized = topic.lower()
     if "order" in normalized and "cash" in normalized:
