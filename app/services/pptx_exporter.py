@@ -26,6 +26,8 @@ from app.models.schemas import (
     Swimlane,
     TextBlock,
 )
+from app.services.designer import design_semantic_presentation
+
 
 
 @dataclass(frozen=True)
@@ -81,7 +83,7 @@ class PptxExporter:
         """Export the entire semantic deck to a .pptx file and return the path."""
 
         model = semantic if isinstance(semantic, SemanticPresentation) else SemanticPresentation.model_validate(semantic)
-        deck = model.normalized()
+        deck = design_semantic_presentation(model.normalized())
 
         prs = Presentation()
         prs.slide_width = Inches(13.333)
@@ -158,27 +160,31 @@ class PptxExporter:
         return float(top)
 
     def _render_semantic_slide(self, pptx_slide: Any, slide: SemanticSlide) -> None:
+        positions = slide.layout_hints.element_positions
+
         if slide.process:
-            self._render_process_flow(pptx_slide, slide.process.steps)
+            self._render_process_flow(pptx_slide, slide.process.steps, positions)
             return
 
         if slide.swimlanes:
-            self._render_swimlanes(pptx_slide, slide.swimlanes.lanes)
+            self._render_swimlanes(pptx_slide, slide.swimlanes.lanes, positions)
             return
 
         if slide.architecture:
-            self._render_layered_architecture(pptx_slide, slide.architecture.layers)
+            self._render_layered_architecture(pptx_slide, slide.architecture.layers, positions)
             return
 
         if slide.roadmap:
-            self._render_roadmap(pptx_slide, slide.roadmap.phases)
+            self._render_roadmap(pptx_slide, slide.roadmap.phases, positions)
             return
 
         if slide.type == SlideType.CONTENT and slide.text_blocks:
-            self._render_basic_bullets(pptx_slide, slide.text_blocks)
+            self._render_basic_bullets(pptx_slide, slide.text_blocks, positions)
 
-    def _render_basic_bullets(self, pptx_slide: Any, blocks: list[TextBlock]) -> None:
-        box = pptx_slide.shapes.add_textbox(Inches(0.75), Inches(1.95), Inches(12.0), Inches(4.8))
+    def _render_basic_bullets(self, pptx_slide: Any, blocks: list[TextBlock], positions: dict[str, Any]) -> None:
+        fallback = {"x": 0.75, "y": 1.95, "w": 12.0, "h": 4.8}
+        first_box = positions.get(blocks[0].id, fallback) if blocks else fallback
+        box = pptx_slide.shapes.add_textbox(Inches(first_box["x"]), Inches(first_box["y"]), Inches(first_box["w"]), Inches(first_box["h"]))
         frame = box.text_frame
         frame.word_wrap = True
         frame.clear()
@@ -190,7 +196,7 @@ class PptxExporter:
             paragraph.font.size = Pt(self.theme.body_size_pt)
             paragraph.font.color.rgb = self.theme.body
 
-    def _render_process_flow(self, pptx_slide: Any, steps: list[ProcessStep]) -> None:
+    def _render_process_flow(self, pptx_slide: Any, steps: list[ProcessStep], positions: dict[str, Any]) -> None:
         left = Inches(0.75)
         top = Inches(2.0)
         width = Inches(2.35)
@@ -206,8 +212,12 @@ class PptxExporter:
             max_cards = min(len(steps), 5)
 
         for idx, step in enumerate(steps[:max_cards]):
-            x = left + idx * (width + gap)
-            box = pptx_slide.shapes.add_shape(MSO_AUTO_SHAPE_TYPE.ROUNDED_RECTANGLE, x, top, width, height)
+            hinted = positions.get(step.id)
+            x = Inches(hinted["x"]) if hinted else left + idx * (width + gap)
+            y = Inches(hinted["y"]) if hinted else top
+            card_w = Inches(hinted["w"]) if hinted else width
+            card_h = Inches(hinted["h"]) if hinted else height
+            box = pptx_slide.shapes.add_shape(MSO_AUTO_SHAPE_TYPE.ROUNDED_RECTANGLE, x, y, card_w, card_h)
             box.fill.solid()
             box.fill.fore_color.rgb = Theme.white
             box.line.color.rgb = Theme.accent
@@ -252,15 +262,19 @@ class PptxExporter:
             connector.line.width = Pt(2)
             connector.line.dash_style = MSO_LINE_DASH_STYLE.SOLID
 
-    def _render_layered_architecture(self, pptx_slide: Any, layers: list[ArchitectureLayer]) -> None:
+    def _render_layered_architecture(self, pptx_slide: Any, layers: list[ArchitectureLayer], positions: dict[str, Any]) -> None:
         left = Inches(1.0)
         top = Inches(1.95)
         width = Inches(11.2)
         layer_h = Inches(1.28)
 
         for idx, layer in enumerate(layers[:4]):
-            y = top + idx * (layer_h + Inches(0.18))
-            rect = pptx_slide.shapes.add_shape(MSO_AUTO_SHAPE_TYPE.ROUNDED_RECTANGLE, left, y, width, layer_h)
+            hinted = positions.get(layer.id)
+            y = Inches(hinted["y"]) if hinted else top + idx * (layer_h + Inches(0.18))
+            card_left = Inches(hinted["x"]) if hinted else left
+            card_width = Inches(hinted["w"]) if hinted else width
+            card_height = Inches(hinted["h"]) if hinted else layer_h
+            rect = pptx_slide.shapes.add_shape(MSO_AUTO_SHAPE_TYPE.ROUNDED_RECTANGLE, card_left, y, card_width, card_height)
             rect.fill.solid()
             rect.fill.fore_color.rgb = Theme.white if idx % 2 == 0 else RGBColor(241, 246, 255)
             rect.line.color.rgb = Theme.border
@@ -285,7 +299,7 @@ class PptxExporter:
                 components.font.size = Pt(self.theme.small_size_pt)
                 components.font.color.rgb = self.theme.muted
 
-    def _render_swimlanes(self, pptx_slide: Any, lanes: list[Swimlane]) -> None:
+    def _render_swimlanes(self, pptx_slide: Any, lanes: list[Swimlane], positions: dict[str, Any]) -> None:
         lane_count = min(max(len(lanes), 1), 6)
         left = Inches(0.75)
         top = Inches(1.95)
@@ -296,14 +310,16 @@ class PptxExporter:
         label_width = Inches(2.1)
 
         for idx, lane in enumerate(lanes[:lane_count]):
-            lane_top = top + idx * (lane_height + gap)
+            hinted = positions.get(lane.id)
+            lane_top = Inches(hinted["y"]) if hinted else top + idx * (lane_height + gap)
+            lane_row_h = Inches(hinted["h"]) if hinted else lane_height
 
             label_card = pptx_slide.shapes.add_shape(
                 MSO_AUTO_SHAPE_TYPE.ROUNDED_RECTANGLE,
                 left,
                 lane_top,
                 label_width,
-                lane_height,
+                lane_row_h,
             )
             label_card.fill.solid()
             label_card.fill.fore_color.rgb = RGBColor(233, 242, 255) if idx % 2 == 0 else RGBColor(240, 247, 255)
@@ -324,7 +340,7 @@ class PptxExporter:
                 left + label_width,
                 lane_top,
                 width - label_width,
-                lane_height,
+                lane_row_h,
             )
             body_card.fill.solid()
             body_card.fill.fore_color.rgb = Theme.white if idx % 2 == 0 else RGBColor(250, 252, 255)
@@ -350,7 +366,7 @@ class PptxExporter:
                 paragraph.font.size = Pt(self.theme.small_size_pt)
                 paragraph.font.color.rgb = self.theme.body
 
-    def _render_roadmap(self, pptx_slide: Any, phases: list[RoadmapPhase]) -> None:
+    def _render_roadmap(self, pptx_slide: Any, phases: list[RoadmapPhase], positions: dict[str, Any]) -> None:
         axis_left = Inches(1.1)
         axis_top = Inches(3.2)
         axis_width = Inches(10.8)
@@ -370,7 +386,8 @@ class PptxExporter:
         marker_r = Inches(0.13)
 
         for idx, phase in enumerate(phases[:count]):
-            center_x = axis_left + spacing * idx + spacing / 2
+            hinted = positions.get(phase.id)
+            center_x = axis_left + spacing * idx + spacing / 2 if not hinted else Inches(hinted["x"] + hinted["w"] / 2)
             circle = pptx_slide.shapes.add_shape(
                 MSO_AUTO_SHAPE_TYPE.OVAL,
                 center_x - marker_r,
@@ -384,11 +401,18 @@ class PptxExporter:
 
             card_top = Inches(1.92) if idx % 2 == 0 else Inches(3.45)
             card_h = Inches(1.35)
+            card_w = Inches(2.2)
+            card_left = center_x - Inches(1.1)
+            if hinted:
+                card_top = Inches(hinted["y"])
+                card_h = Inches(hinted["h"])
+                card_w = Inches(hinted["w"])
+                card_left = Inches(hinted["x"])
             card = pptx_slide.shapes.add_shape(
                 MSO_AUTO_SHAPE_TYPE.ROUNDED_RECTANGLE,
-                center_x - Inches(1.1),
+                card_left,
                 card_top,
-                Inches(2.2),
+                card_w,
                 card_h,
             )
             card.fill.solid()

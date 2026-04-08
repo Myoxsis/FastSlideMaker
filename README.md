@@ -8,6 +8,7 @@ Fast Slide Maker is a lightweight FastAPI app for generating, editing, and expor
 - LLM generation supports graceful fallback to deterministic mock mode.
 - JSON parsing is validated for model output and project files.
 - Export writes deterministic artifacts under `artifacts/`.
+- Semantic decks pass through a deterministic designer phase (validator -> designer -> renderer/exporter).
 - Frontend surfaces save/load/export failures instead of silently ignoring them.
 
 ## Quickstart
@@ -84,3 +85,11 @@ static/js/app.js
 samples/
 tests/
 ```
+
+## Designer phase
+
+A deterministic Python designer phase runs before semantic rendering and PPTX export. It applies spacing, fit, overlap, and density rules from `app/services/design_rules.json` and writes `layout_hints` + normalized `diagram_data` per slide.
+
+Pipeline: `LLM -> JSON -> validator -> designer -> renderer -> PPTX exporter`.
+
+See `samples/designer_transformation.sample.json` for a before/after transformation example.
