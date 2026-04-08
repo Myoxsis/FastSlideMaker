@@ -204,7 +204,7 @@ def _build_default_semantic_deck() -> SemanticPresentation:
 
 
 @router.get("/health")
-async def healthcheck(request: Request) -> dict:
+async def health_check(request: Request) -> dict:
     return {
         "status": "ok",
         "ollama_available": getattr(request.app.state, "ollama_available", False),
@@ -245,6 +245,8 @@ async def load_project(project_id: str, request: Request) -> dict:
         payload = project_store.load_project(project_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     request.app.state.semantic_preview_deck = SemanticPresentation.model_validate(payload["deck"])
     return payload
@@ -285,8 +287,10 @@ async def export_project_pptx(project_id: str, request: Request) -> FileResponse
 @router.post("/api/generate", response_model=DeckResponse)
 async def generate_slides(payload: DeckRequest, request: Request) -> DeckResponse:
     generation_service: GenerationService = getattr(request.app.state, "generation_service", GenerationService())
-
-    generated_deck = await generation_service.generate(payload)
+    try:
+        generated_deck = await generation_service.generate(payload)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     validated_deck = ValidationService().validate(generated_deck)
     rendered_deck = RenderingService().render(validated_deck)
     export_artifacts = ExportService().export(rendered_deck)

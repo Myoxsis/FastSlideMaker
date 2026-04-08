@@ -9,6 +9,7 @@ import httpx
 from app.core.config import settings
 from app.models.schemas import Deck, DeckRequest
 from app.services.mock_mode import build_mock_deck
+from app.utils.json_utils import extract_json_object
 
 
 class GenerationService:
@@ -59,8 +60,14 @@ class GenerationService:
         except (httpx.HTTPError, ValueError):
             return None
 
-        # TODO: replace with robust JSON extraction/parsing logic.
         if not content:
             return None
 
-        return None
+        parsed = extract_json_object(content)
+        if not parsed:
+            return None
+
+        try:
+            return Deck.model_validate(parsed)
+        except ValueError:
+            return None
