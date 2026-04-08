@@ -1,0 +1,14 @@
+{
+  "slide_margin": 0.6,
+  "min_spacing": 0.18,
+  "max_process_steps_per_row": 6,
+  "max_process_steps_total": 12,
+  "max_items_per_layer": 5,
+  "max_roadmap_phases": 5,
+  "max_milestones_per_phase": 3,
+  "max_swimlane_items": 5,
+  "max_generic_bullets": 6,
+  "max_chars_per_line": 120,
+  "max_label_chars": 44,
+  "max_body_chars": 180
+}

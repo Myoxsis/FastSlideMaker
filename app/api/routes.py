@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
 from app.models.schemas import DeckRequest, DeckResponse, MilestoneStatus, SemanticPresentation, SlideType, TextRole
+from app.services.designer import DesignerService
 from app.services.export import ExportService
 from app.services.generation import GenerationService
 from app.services.mock_mode import CANNED_SAMPLE_PROMPTS, DECK_TEMPLATES
@@ -219,16 +220,17 @@ async def index(request: Request) -> HTMLResponse:
 
 @router.get("/api/semantic-deck", response_model=SemanticPresentation)
 async def get_semantic_deck(request: Request) -> SemanticPresentation:
+    designer = DesignerService()
     if not hasattr(request.app.state, "semantic_preview_deck"):
-        request.app.state.semantic_preview_deck = _build_default_semantic_deck()
-    return request.app.state.semantic_preview_deck
+        request.app.state.semantic_preview_deck = designer.design_presentation(_build_default_semantic_deck())
+    return designer.design_presentation(request.app.state.semantic_preview_deck)
 
 
 @router.put("/api/semantic-deck", response_model=SemanticPresentation)
 async def update_semantic_deck(payload: SemanticPresentation, request: Request) -> SemanticPresentation:
-    normalized = payload.normalized()
-    request.app.state.semantic_preview_deck = normalized
-    return normalized
+    designed = DesignerService().design_presentation(payload.normalized())
+    request.app.state.semantic_preview_deck = designed
+    return designed
 
 
 @router.get("/api/projects")
@@ -255,7 +257,8 @@ async def load_project(project_id: str, request: Request) -> dict:
 @router.post("/api/projects")
 async def save_project(payload: SaveProjectRequest, request: Request) -> dict:
     project_store = _project_store(request)
-    return project_store.save_project(payload.name, payload.deck)
+    designed = DesignerService().design_presentation(payload.deck)
+    return project_store.save_project(payload.name, designed)
 
 
 @router.get("/api/projects/{project_id}/export/json")

@@ -1,0 +1,54 @@
+{
+  "before": {
+    "id": "process-flow",
+    "order": 1,
+    "type": "process",
+    "title": "Program Delivery Process",
+    "objective": "Show end-to-end execution steps.",
+    "process": {
+      "steps": [
+        {"id": "s1", "label": "Intake and assessment of all requests from all enterprise teams", "description": "Collect and classify demand."},
+        {"id": "s2", "label": "Prioritize", "description": "Agree scope."},
+        {"id": "s3", "label": "Design", "description": "Draft architecture."},
+        {"id": "s4", "label": "Build", "description": "Implement and test."},
+        {"id": "s5", "label": "Release", "description": "Deploy safely."},
+        {"id": "s6", "label": "Measure", "description": "Track outcomes."},
+        {"id": "s7", "label": "Optimize", "description": "Iterate."}
+      ]
+    }
+  },
+  "after": {
+    "id": "process-flow",
+    "order": 1,
+    "type": "process",
+    "title": "Program Delivery Process",
+    "objective": "Show end-to-end execution steps.",
+    "process": {
+      "steps": [
+        {"id": "s1", "label": "Intake and assessment of all requests from…", "description": "Collect and classify demand."},
+        {"id": "s2", "label": "Prioritize", "description": "Agree scope."},
+        {"id": "s3", "label": "Design", "description": "Draft architecture."},
+        {"id": "s4", "label": "Build", "description": "Implement and test."},
+        {"id": "s5", "label": "Release", "description": "Deploy safely."},
+        {"id": "s6", "label": "Measure", "description": "Track outcomes."},
+        {"id": "s7", "label": "Optimize", "description": "Iterate."}
+      ]
+    },
+    "diagram_data": {
+      "type": "process_flow",
+      "rows": 2,
+      "arrows": "horizontal_then_down",
+      "step_ids": ["s1", "s2", "s3", "s4", "s5", "s6", "s7"]
+    },
+    "layout_hints": {
+      "grid": "process_rows",
+      "spacing": "0.18in",
+      "element_positions": {
+        "s1": {"x": 0.922, "y": 1.8, "w": 1.85, "h": 0.95, "row": 0},
+        "s7": {"x": 5.742, "y": 2.93, "w": 1.85, "h": 0.95, "row": 1}
+      },
+      "overflow_strategy": "split",
+      "grouping": "rows:2"
+    }
+  }
+}

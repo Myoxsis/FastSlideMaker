@@ -172,6 +172,18 @@ class IssueImplicationRecommendationContent(BaseModel):
     blocks: list[IssueBlock] = Field(..., min_length=1, max_length=6)
 
 
+
+
+class LayoutHints(BaseModel):
+    """Deterministic layout hints produced by the designer phase."""
+
+    grid: str = Field(default="single_column", max_length=64)
+    spacing: str = Field(default="normal", max_length=64)
+    element_positions: dict[str, dict[str, float | int | str]] = Field(default_factory=dict)
+    overflow_strategy: str = Field(default="wrap", max_length=64)
+    grouping: str = Field(default="none", max_length=120)
+
+
 class SemanticSlide(BaseModel):
     """Semantic slide definition with no coordinate/layout coupling."""
 
@@ -189,6 +201,8 @@ class SemanticSlide(BaseModel):
     integrations: list[Integration] = Field(default_factory=list, max_length=20)
     roadmap: RoadmapContent | None = None
     issue_implication_recommendation: IssueImplicationRecommendationContent | None = None
+    layout_hints: LayoutHints = Field(default_factory=LayoutHints)
+    diagram_data: dict[str, Any] = Field(default_factory=dict)
 
     MAX_TEXT_CHARS: int = 1200
     MAX_DENSITY_ITEMS: int = 24
@@ -258,6 +272,8 @@ class SemanticSlide(BaseModel):
                     )
                     for block in self.text_blocks
                 ],
+                "layout_hints": self.layout_hints.model_copy(deep=True),
+                "diagram_data": dict(self.diagram_data),
                 "integrations": sorted(self.integrations, key=lambda item: (item.system.lower(), item.id)),
             },
         )

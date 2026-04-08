@@ -31,6 +31,7 @@ from app.models.schemas import (
     TextRole,
 )
 from app.services.deck_planner import SlidePlanItem
+from app.services.designer import DesignerService
 from app.services.llm_client import OllamaLLMClient
 from app.utils.json_utils import extract_json_object
 
@@ -38,8 +39,9 @@ from app.utils.json_utils import extract_json_object
 class SlideGenerator:
     """Generates exactly one validated semantic slide for plan/regeneration workflows."""
 
-    def __init__(self, llm_client: OllamaLLMClient | None = None) -> None:
+    def __init__(self, llm_client: OllamaLLMClient | None = None, designer: DesignerService | None = None) -> None:
         self._llm = llm_client or OllamaLLMClient()
+        self._designer = designer or DesignerService()
 
     async def generate_semantic_slide(
         self,
@@ -72,7 +74,8 @@ class SlideGenerator:
         )
 
         normalized_json = self._normalize_slide_json(semantic_json, slide_type)
-        return self._validate_or_fallback(normalized_json, slide_id, order, title or "Slide", current_slide_objective, slide_type)
+        validated = self._validate_or_fallback(normalized_json, slide_id, order, title or "Slide", current_slide_objective, slide_type)
+        return self._designer.design_slide(validated)
 
     async def regenerate_semantic_slide(
         self,
