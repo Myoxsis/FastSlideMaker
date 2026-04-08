@@ -25,6 +25,7 @@ from app.models.schemas import (
     SlideType,
     Swimlane,
     TextBlock,
+    VisualElement,
 )
 from app.services.designer import design_semantic_presentation
 
@@ -181,6 +182,9 @@ class PptxExporter:
         if slide.type == SlideType.CONTENT and slide.text_blocks:
             self._render_basic_bullets(pptx_slide, slide.text_blocks, positions)
 
+        if slide.visual_elements:
+            self._render_visual_elements(pptx_slide, slide.visual_elements)
+
     def _render_basic_bullets(self, pptx_slide: Any, blocks: list[TextBlock], positions: dict[str, Any]) -> None:
         fallback = {"x": 0.75, "y": 1.95, "w": 12.0, "h": 4.8}
         first_box = positions.get(blocks[0].id, fallback) if blocks else fallback
@@ -191,10 +195,16 @@ class PptxExporter:
 
         for idx, block in enumerate(blocks):
             paragraph = frame.paragraphs[0] if idx == 0 else frame.add_paragraph()
-            paragraph.text = f"• {_wrap_text(block.text, max_chars=100)}"
+            bullet = "•" if block.style.bullet_style != "dash" else "-"
+            if block.style.bullet_style == "number":
+                bullet = f"{idx + 1}."
+            paragraph.text = f"{bullet} {_wrap_text(block.text, max_chars=100)}"
             paragraph.level = 0
-            paragraph.font.size = Pt(self.theme.body_size_pt)
-            paragraph.font.color.rgb = self.theme.body
+            paragraph.font.size = Pt(block.style.font_size)
+            paragraph.font.bold = block.style.font_weight.value == "bold"
+            paragraph.font.italic = block.style.italic
+            paragraph.font.color.rgb = _rgb_from_hex(block.style.text_color, fallback=self.theme.body)
+            paragraph.alignment = _pp_align(block.style.text_align.value)
 
     def _render_process_flow(self, pptx_slide: Any, steps: list[ProcessStep], positions: dict[str, Any]) -> None:
         left = Inches(0.75)
@@ -446,6 +456,44 @@ class PptxExporter:
             link.line.color.rgb = Theme.border
             link.line.dash_style = MSO_LINE_DASH_STYLE.ROUND_DOT
 
+
+
+    def _render_visual_elements(self, pptx_slide: Any, elements: list[VisualElement]) -> None:
+        for element in sorted(elements, key=lambda item: item.z_index):
+            if element.type in {"line", "arrow", "connector", "divider"}:
+                connector = pptx_slide.shapes.add_connector(
+                    MSO_CONNECTOR.STRAIGHT,
+                    Inches(element.x / 96),
+                    Inches(element.y / 96),
+                    Inches((element.x + element.w) / 96),
+                    Inches((element.y + element.h) / 96),
+                )
+                connector.line.color.rgb = _rgb_from_hex(element.style.border_color, fallback=Theme.border)
+                connector.line.width = Pt(max(0.5, element.style.border_width))
+                continue
+
+            shape_type = MSO_AUTO_SHAPE_TYPE.ROUNDED_RECTANGLE if element.type == "rounded_rectangle" else MSO_AUTO_SHAPE_TYPE.RECTANGLE
+            if element.type == "circle":
+                shape_type = MSO_AUTO_SHAPE_TYPE.OVAL
+            shape = pptx_slide.shapes.add_shape(
+                shape_type,
+                Inches(element.x / 96),
+                Inches(element.y / 96),
+                Inches(element.w / 96),
+                Inches(element.h / 96),
+            )
+            shape.fill.solid()
+            shape.fill.fore_color.rgb = _rgb_from_hex(element.style.fill_color, fallback=Theme.white)
+            shape.fill.transparency = 1.0 - element.style.opacity
+            shape.line.color.rgb = _rgb_from_hex(element.style.border_color, fallback=Theme.border)
+            shape.line.width = Pt(max(0.5, element.style.border_width))
+
+            frame = shape.text_frame
+            frame.clear()
+            frame.paragraphs[0].text = element.label or ""
+            frame.paragraphs[0].font.size = Pt(11)
+            frame.paragraphs[0].font.color.rgb = Theme.body
+
     @staticmethod
     def _milestone_line(milestone: Milestone) -> str:
         return f"• {milestone.label} ({milestone.target_period})"
@@ -460,6 +508,25 @@ class PptxExporter:
             return Theme.warning
         return Theme.muted
 
+
+
+
+def _rgb_from_hex(color: str, fallback: RGBColor) -> RGBColor:
+    try:
+        cleaned = color.strip().lstrip("#")
+        if len(cleaned) != 6:
+            return fallback
+        return RGBColor(int(cleaned[0:2], 16), int(cleaned[2:4], 16), int(cleaned[4:6], 16))
+    except Exception:
+        return fallback
+
+
+def _pp_align(value: str) -> PP_ALIGN:
+    if value == "center":
+        return PP_ALIGN.CENTER
+    if value == "right":
+        return PP_ALIGN.RIGHT
+    return PP_ALIGN.LEFT
 
 def export_semantic_deck_to_pptx(
     semantic_json: SemanticPresentation | dict[str, Any],
