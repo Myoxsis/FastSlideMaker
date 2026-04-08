@@ -3,15 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Fast Slide Maker — Semantic Preview</title>
+    <title>Fast Slide Maker — Presentation Editor</title>
     <link rel="stylesheet" href="/static/css/styles.css" />
   </head>
   <body>
     <main class="app-shell">
       <header class="app-header">
         <div>
-          <h1>Semantic Slide Preview</h1>
-          <p>Deterministic HTML rendering powered by semantic JSON.</p>
+          <h1>Fast Slide Maker Editor</h1>
+          <p>JSON-driven, deterministic presentation editor with native PPTX output.</p>
         </div>
         <div class="header-controls">
           <input id="project-name" type="text" placeholder="Project name" />
@@ -21,16 +21,34 @@
         </div>
       </header>
 
-      <section class="workspace">
+      <section id="editor-toolbar" class="editor-toolbar">
+        <button data-action="nudge-left" type="button">◀</button>
+        <button data-action="nudge-right" type="button">▶</button>
+        <button data-action="nudge-up" type="button">▲</button>
+        <button data-action="nudge-down" type="button">▼</button>
+        <button data-action="bring-forward" type="button">Bring forward</button>
+        <button data-action="send-backward" type="button">Send backward</button>
+        <button data-action="duplicate-element" type="button">Duplicate</button>
+        <button data-action="delete-element" type="button">Delete</button>
+        <span class="toolbar-divider"></span>
+        <button data-action="insert-shape:rectangle" type="button">Rectangle</button>
+        <button data-action="insert-shape:rounded_rectangle" type="button">Rounded</button>
+        <button data-action="insert-shape:circle" type="button">Circle</button>
+        <button data-action="insert-shape:line" type="button">Line</button>
+        <button data-action="insert-shape:arrow" type="button">Arrow</button>
+        <button data-action="insert-shape:connector" type="button">Connector</button>
+        <button data-action="insert-shape:callout" type="button">Callout</button>
+        <button data-action="insert-shape:divider" type="button">Divider</button>
+        <button data-action="insert-shape:legend" type="button">Legend</button>
+        <button data-action="insert-shape:section_header" type="button">Section Header</button>
+        <button data-action="insert-shape:icon" type="button">Icon</button>
+      </section>
+
+      <section class="workspace presentation-layout">
         <aside class="deck-panel" aria-label="Slide list">
           <section class="prompt-panel">
             <h3>Prompt</h3>
-            <textarea
-              id="prompt-input"
-              rows="8"
-              placeholder="Enter the source prompt for this deck..."
-              aria-label="Current generation prompt"
-            ></textarea>
+            <textarea id="prompt-input" rows="6" placeholder="Enter prompt"></textarea>
             <small id="prompt-updated-at" class="muted"></small>
             <div class="prompt-actions">
               <button id="update-prompt" type="button">Update prompt</button>
@@ -38,12 +56,17 @@
               <button id="regenerate-slide" type="button">Regenerate selected slide</button>
             </div>
           </section>
-          <h2>Deck</h2>
+          <h2>Slides</h2>
+          <div class="slide-actions">
+            <button id="add-slide" type="button">Add</button>
+            <button id="duplicate-slide" type="button">Duplicate</button>
+            <button id="delete-slide" type="button">Delete</button>
+          </div>
+          <ul id="deck-list"></ul>
           <div class="project-gallery">
             <h3>Project Gallery</h3>
             <ul id="project-gallery-list"></ul>
           </div>
-          <ul id="deck-list"></ul>
         </aside>
 
         <section class="slide-panel">
@@ -55,6 +78,8 @@
           </div>
           <article id="slide-preview" class="slide-preview" aria-live="polite"></article>
         </section>
+
+        <aside class="inspector-panel" id="inspector-panel"></aside>
       </section>
 
       <section class="json-panel">
@@ -63,6 +88,6 @@
       </section>
     </main>
 
-    <script src="/static/js/app.js"></script>
+    <script type="module" src="/static/js/app.js"></script>
   </body>
 </html>

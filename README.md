@@ -82,6 +82,11 @@ app/
 project_store.py
 templates/index.html
 static/js/app.js
+static/js/editor_state.js
+static/js/selection_manager.js
+static/js/toolbar.js
+static/js/inspector.js
+static/js/shape_factory.js
 samples/
 tests/
 ```
@@ -93,3 +98,20 @@ A deterministic Python designer phase runs before semantic rendering and PPTX ex
 Pipeline: `LLM -> JSON -> validator -> designer -> renderer -> PPTX exporter`.
 
 See `samples/designer_transformation.sample.json` for a before/after transformation example.
+
+
+## Presentation editor capabilities
+
+The web UI now includes a structured presentation-editor layer with:
+- Top toolbar for arrangement actions and inserting deterministic shapes/icons/callouts/dividers.
+- Left slide thumbnail manager with add/duplicate/delete controls.
+- Center slide canvas with element selection highlighting and inline text editing.
+- Right inspector panel for text and shape properties (size, weight, colors, alignment, opacity, borders, spacing, padding, bullet style, casing, lock flag).
+- JSON-first state updates: edits are written back to semantic slide JSON (`text_blocks.style`, `visual_elements`, `layout_hints`, `user_locked`, `user_modified`).
+- Regeneration lock behavior: `user_locked` slides/elements are preserved during regeneration, and manual visual overrides are retained where possible.
+- PPTX export maps edited text/shape styles to native editable PowerPoint primitives (text formatting, fill, border, alignment, order).
+
+### Current limitations
+- Multi-select is basic (shift-select tracks IDs but arrangement is primarily single-element actions).
+- Direct drag-and-drop is intentionally limited; inspector + nudge controls are the primary editing path.
+- Shape set is intentionally constrained to keep rendering deterministic and schema-safe.

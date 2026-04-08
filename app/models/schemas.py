@@ -61,11 +61,87 @@ class RecommendationPriority(str, Enum):
     CRITICAL = "critical"
 
 
+
+
+class FontWeight(str, Enum):
+    REGULAR = "regular"
+    BOLD = "bold"
+
+
+class TextAlign(str, Enum):
+    LEFT = "left"
+    CENTER = "center"
+    RIGHT = "right"
+
+
+class VerticalAlign(str, Enum):
+    TOP = "top"
+    MIDDLE = "middle"
+    BOTTOM = "bottom"
+
+
+class BulletStyle(str, Enum):
+    DISC = "disc"
+    DASH = "dash"
+    NUMBER = "number"
+
+
+class ElementRole(str, Enum):
+    TEXT = "text"
+    SHAPE = "shape"
+    ICON = "icon"
+    DIVIDER = "divider"
+    CALLOUT = "callout"
+    LEGEND = "legend"
+    SECTION_HEADER = "section_header"
+
+
+class TextStyle(BaseModel):
+    font_size: int = Field(default=16, ge=8, le=72)
+    font_weight: FontWeight = FontWeight.REGULAR
+    italic: bool = False
+    text_color: str = Field(default="#111827", max_length=16)
+    text_align: TextAlign = TextAlign.LEFT
+    vertical_align: VerticalAlign = VerticalAlign.TOP
+    line_spacing: float = Field(default=1.2, ge=1.0, le=2.5)
+    bullet_style: BulletStyle = BulletStyle.DISC
+    padding: int = Field(default=8, ge=0, le=64)
+    text_case: str = Field(default="sentence", max_length=16)
+    font_family: str = Field(default="Inter", max_length=64)
+
+
+class ShapeStyle(BaseModel):
+    fill_color: str = Field(default="#ffffff", max_length=16)
+    border_color: str = Field(default="#94a3b8", max_length=16)
+    border_width: float = Field(default=1.0, ge=0.0, le=12.0)
+    corner_radius: int = Field(default=0, ge=0, le=999)
+    opacity: float = Field(default=1.0, ge=0.1, le=1.0)
+
+
+class VisualElement(BaseModel):
+    id: str = Field(..., min_length=1, max_length=64)
+    type: str = Field(..., min_length=1, max_length=32)
+    label: Label | None = None
+    x: float = 0.0
+    y: float = 0.0
+    w: float = 120.0
+    h: float = 60.0
+    z_index: int = Field(default=1, ge=1, le=500)
+    element_role: ElementRole = ElementRole.SHAPE
+    style: ShapeStyle = Field(default_factory=ShapeStyle)
+    is_user_modified: bool = False
+    user_locked: bool = False
+    user_modified: bool = False
+
 class TextBlock(BaseModel):
     id: str = Field(..., min_length=1, max_length=64)
     role: TextRole = TextRole.BODY
     label: Label | None = None
     text: LongText
+    style: TextStyle = Field(default_factory=TextStyle)
+    user_locked: bool = False
+    user_modified: bool = False
+    is_user_modified: bool = False
 
 
 class DiagramNode(BaseModel):
@@ -182,6 +258,14 @@ class LayoutHints(BaseModel):
     element_positions: dict[str, dict[str, float | int | str]] = Field(default_factory=dict)
     overflow_strategy: str = Field(default="wrap", max_length=64)
     grouping: str = Field(default="none", max_length=120)
+    margin_x: int = Field(default=36, ge=0, le=180)
+    margin_y: int = Field(default=24, ge=0, le=120)
+    spacing_density: str = Field(default="standard", max_length=32)
+    template_variant: str = Field(default="default", max_length=64)
+    grid_visible: bool = True
+    safe_bounds_visible: bool = True
+    snap_to_grid: bool = True
+    show_guides: bool = True
 
 
 class SemanticSlide(BaseModel):
@@ -202,7 +286,10 @@ class SemanticSlide(BaseModel):
     roadmap: RoadmapContent | None = None
     issue_implication_recommendation: IssueImplicationRecommendationContent | None = None
     layout_hints: LayoutHints = Field(default_factory=LayoutHints)
+    visual_elements: list[VisualElement] = Field(default_factory=list, max_length=120)
     diagram_data: dict[str, Any] = Field(default_factory=dict)
+    user_locked: bool = False
+    user_modified: bool = False
 
     MAX_TEXT_CHARS: int = 1200
     MAX_DENSITY_ITEMS: int = 24
@@ -291,6 +378,13 @@ class PresentationMetadata(BaseModel):
     tags: list[Label] = Field(default_factory=list, max_length=20)
 
 
+class PresentationTheme(BaseModel):
+    font_family: str = Field(default="Inter", max_length=64)
+    palette: list[str] = Field(default_factory=lambda: ["#1f3a8a", "#2563eb", "#0f766e", "#7c3aed", "#111827", "#dc2626"], max_length=16)
+    title_preset: str = Field(default="executive", max_length=64)
+    diagram_preset: str = Field(default="enterprise", max_length=64)
+
+
 class SemanticPresentation(BaseModel):
     """Internal source-of-truth representation for renderer/exporter pipelines."""
 
@@ -299,6 +393,7 @@ class SemanticPresentation(BaseModel):
     slide_order: list[str] = Field(..., min_length=1, max_length=500)
     user_prompt: str = Field(default="", max_length=8000)
     prompt_last_updated_at: str | None = None
+    theme: PresentationTheme = Field(default_factory=PresentationTheme)
 
     @model_validator(mode="after")
     def validate_slide_order(self) -> "SemanticPresentation":

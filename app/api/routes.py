@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
-from app.models.schemas import DeckRequest, DeckResponse, MilestoneStatus, SemanticPresentation, SlideType, TextBlock, TextRole
+from app.models.schemas import DeckRequest, DeckResponse, MilestoneStatus, SemanticPresentation, SemanticSlide, SlideType, TextBlock, TextRole
 from app.services.designer import DesignerService
 from app.services.export import ExportService
 from app.services.generation import GenerationService
@@ -221,6 +221,31 @@ def _build_default_semantic_deck() -> SemanticPresentation:
         }
     )
 
+
+
+def _preserve_user_overrides(previous: SemanticSlide, regenerated: SemanticSlide) -> SemanticSlide:
+    if previous.user_locked:
+        return previous.model_copy(deep=True)
+
+    regenerated = regenerated.model_copy(deep=True)
+    regenerated.user_modified = previous.user_modified
+
+    previous_blocks = {block.id: block for block in previous.text_blocks}
+    for block in regenerated.text_blocks:
+        old = previous_blocks.get(block.id)
+        if not old:
+            continue
+        if old.user_locked:
+            block.text = old.text
+        block.style = old.style.model_copy(deep=True)
+        block.user_locked = old.user_locked
+        block.user_modified = old.user_modified
+        block.is_user_modified = old.is_user_modified
+
+    regenerated.visual_elements = [item.model_copy(deep=True) for item in previous.visual_elements]
+    regenerated.layout_hints = previous.layout_hints.model_copy(deep=True)
+    return regenerated
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -241,9 +266,12 @@ def _regenerate_semantic_deck(deck: SemanticPresentation, prompt: str) -> Semant
         updated.metadata.purpose = normalized_prompt[:280]
 
     for index, slide in enumerate(updated.slides, start=1):
+        if slide.user_locked:
+            continue
         slide.objective = f"Generated from current prompt for {slide.title}."
         if slide.text_blocks:
-            slide.text_blocks[0].text = _build_regenerated_text(normalized_prompt, slide.title, index)[:2000]
+            if not slide.text_blocks[0].user_locked:
+                slide.text_blocks[0].text = _build_regenerated_text(normalized_prompt, slide.title, index)[:2000]
         else:
             slide.text_blocks = [
                 TextBlock(
@@ -262,12 +290,16 @@ def _regenerate_single_slide(deck: SemanticPresentation, prompt: str, slide_id: 
     updated.user_prompt = normalized_prompt
     updated.prompt_last_updated_at = _now_iso()
 
-    for slide in updated.slides:
+    for idx, slide in enumerate(updated.slides):
         if slide.id != slide_id:
             continue
+        if slide.user_locked:
+            break
+        previous = slide.model_copy(deep=True)
         slide.objective = f"Generated from current prompt for {slide.title}."
         if slide.text_blocks:
-            slide.text_blocks[0].text = _build_regenerated_text(normalized_prompt, slide.title, slide.order)[:2000]
+            if not slide.text_blocks[0].user_locked:
+                slide.text_blocks[0].text = _build_regenerated_text(normalized_prompt, slide.title, slide.order)[:2000]
         else:
             slide.text_blocks = [
                 TextBlock(
@@ -277,6 +309,7 @@ def _regenerate_single_slide(deck: SemanticPresentation, prompt: str, slide_id: 
                     text=_build_regenerated_text(normalized_prompt, slide.title, slide.order)[:2000],
                 )
             ]
+        updated.slides[idx] = _preserve_user_overrides(previous, slide)
         break
     else:
         raise HTTPException(status_code=404, detail=f"Slide '{slide_id}' not found in current deck.")

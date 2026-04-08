@@ -1,9 +1,7 @@
-const appState = {
-  deck: null,
-  selectedSlideId: null,
-  selectedProjectId: null,
-  projects: [],
-};
+import { ensureDeckDefaults, getSelectedSlide, state, updateSelection } from "./editor_state.js";
+import { applySelectionClass, attachSelectionHandlers } from "./selection_manager.js";
+import { attachInspectorHandlers, updateInspectorFromSelection } from "./inspector.js";
+import { attachToolbarHandlers } from "./toolbar.js";
 
 const deckList = document.getElementById("deck-list");
 const slidePreview = document.getElementById("slide-preview");
@@ -19,6 +17,9 @@ const promptUpdatedAt = document.getElementById("prompt-updated-at");
 const updatePromptButton = document.getElementById("update-prompt");
 const regenerateDeckButton = document.getElementById("regenerate-deck");
 const regenerateSlideButton = document.getElementById("regenerate-slide");
+const toolbar = document.getElementById("editor-toolbar");
+const inspector = document.getElementById("inspector-panel");
+
 let statusTimeout = null;
 
 function setStatus(message, isError = false) {
@@ -30,7 +31,7 @@ function setStatus(message, isError = false) {
     const slide = getSelectedSlide();
     slideTitleLabel.textContent = slide ? `${slide.order}. ${slide.title}` : "";
     slideTitleLabel.style.color = "";
-  }, 2500);
+  }, 2600);
 }
 
 async function parseJsonResponse(response) {
@@ -39,526 +40,234 @@ async function parseJsonResponse(response) {
     try {
       const payload = await response.json();
       detail = payload.detail || detail;
-    } catch (_error) {
-      // Non-JSON error body.
-    }
+    } catch (_error) {}
     throw new Error(detail);
   }
   return response.json();
 }
 
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function getSelectedSlide() {
-  if (!appState.deck || !appState.selectedSlideId) return null;
-  return appState.deck.slides.find((slide) => slide.id === appState.selectedSlideId) || null;
-}
+const escapeHtml = (value) => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 
 function renderProjectGallery() {
-  if (!appState.projects.length) {
-    projectGalleryList.innerHTML = "<li><small class=\"muted\">No saved projects yet.</small></li>";
+  if (!state.projects.length) {
+    projectGalleryList.innerHTML = '<li><small class="muted">No saved projects yet.</small></li>';
     return;
   }
-
-  projectGalleryList.innerHTML = appState.projects
-    .map(
-      (project) => `
-      <li class="project-item">
-        <div>
-          <strong>${escapeHtml(project.name)}</strong>
-          <small>${escapeHtml(project.source)} · ${escapeHtml(project.updated_at || "")}</small>
-        </div>
-        <button type="button" data-load-project-id="${project.project_id}">Load</button>
-      </li>
-    `
-    )
+  projectGalleryList.innerHTML = state.projects
+    .map((project) => `<li class="project-item"><div><strong>${escapeHtml(project.name)}</strong><small>${escapeHtml(project.source)} · ${escapeHtml(project.updated_at || "")}</small></div><button type="button" data-load-project-id="${project.project_id}">Load</button></li>`)
     .join("");
 }
 
 function renderDeckList() {
-  if (!appState.deck) return;
-
-  const listMarkup = appState.deck.slide_order
-    .map((slideId) => appState.deck.slides.find((candidate) => candidate.id === slideId))
+  if (!state.deck) return;
+  deckList.innerHTML = state.deck.slide_order
+    .map((slideId) => state.deck.slides.find((item) => item.id === slideId))
     .filter(Boolean)
-    .map((slide) => {
-      const isActive = slide.id === appState.selectedSlideId;
-      return `
-      <li>
-        <button class="deck-item ${isActive ? "active" : ""}" data-slide-id="${slide.id}">
-          <span class="deck-item-order">${slide.order}</span>
-          <span>
-            <strong>${escapeHtml(slide.title)}</strong>
-            <small>${escapeHtml(slide.type.replaceAll("_", " "))}</small>
-          </span>
-        </button>
-      </li>
-    `;
+    .map(
+      (slide) => `<li><button class="deck-item ${slide.id === state.selectedSlideId ? "active" : ""}" data-slide-id="${slide.id}"><span class="deck-item-order">${slide.order}</span><span><strong>${escapeHtml(slide.title)}</strong><small>${escapeHtml(slide.type.replaceAll("_", " "))}</small></span></button></li>`
+    )
+    .join("");
+}
+
+function blockStyle(style = {}) {
+  return `font-size:${style.font_size || 16}px;font-weight:${style.font_weight === "bold" ? 700 : 400};font-style:${style.italic ? "italic" : "normal"};color:${style.text_color || "#111827"};text-align:${style.text_align || "left"};line-height:${style.line_spacing || 1.2};padding:${style.padding || 8}px;text-transform:${style.text_case === "uppercase" ? "uppercase" : "none"};font-family:${style.font_family || state.deck?.theme?.font_family || "Inter"};`;
+}
+
+function renderSlideCanvas(slide) {
+  const textBlocks = (slide.text_blocks || [])
+    .map((block) => `<article class="text-card canvas-element" data-element-key="text:${block.id}" style="${blockStyle(block.style)}"><strong contenteditable="true" data-edit-type="block-label" data-block-id="${block.id}">${escapeHtml(block.label || "")}</strong><p contenteditable="true" data-edit-type="block-text" data-block-id="${block.id}">${escapeHtml(block.text || "")}</p></article>`)
+    .join("");
+
+  const shapes = (slide.visual_elements || [])
+    .sort((a, b) => (a.z_index || 0) - (b.z_index || 0))
+    .map((shape) => {
+      const style = shape.style || {};
+      return `<div class="shape-element canvas-element shape-${shape.type}" data-element-key="shape:${shape.id}" style="left:${shape.x || 0}px;top:${shape.y || 0}px;width:${shape.w || 120}px;height:${shape.h || 60}px;z-index:${shape.z_index || 1};background:${style.fill_color || "transparent"};border:${style.border_width || 1}px solid ${style.border_color || "#64748b"};opacity:${style.opacity ?? 1};border-radius:${style.corner_radius || 0}px;"><span>${escapeHtml(shape.label || shape.type)}</span></div>`;
     })
     .join("");
 
-  deckList.innerHTML = listMarkup;
+  return `<div class="canvas ${slide.layout_hints.grid_visible ? "with-grid" : ""} ${slide.layout_hints.safe_bounds_visible ? "with-safe-bounds" : ""}"><header class="slide-heading canvas-element" data-element-key="title:slide-title"><h3 contenteditable="true" data-edit-type="slide-title">${escapeHtml(slide.title)}</h3><p contenteditable="true" data-edit-type="slide-objective" data-element-key="objective:slide-objective">${escapeHtml(slide.objective || "")}</p></header><section class="content-group">${textBlocks}</section>${shapes}</div>`;
 }
 
 function renderPromptPanel() {
-  if (!appState.deck) return;
-  promptInput.value = appState.deck.user_prompt || "";
-  promptUpdatedAt.textContent = appState.deck.prompt_last_updated_at
-    ? `Last updated: ${appState.deck.prompt_last_updated_at}`
-    : "Last updated: never";
+  if (!state.deck) return;
+  promptInput.value = state.deck.user_prompt || "";
+  promptUpdatedAt.textContent = state.deck.prompt_last_updated_at ? `Last updated: ${state.deck.prompt_last_updated_at}` : "Last updated: never";
 }
 
-function renderTextBlocks(textBlocks) {
-  if (!textBlocks || textBlocks.length === 0) return "";
-  return `
-    <section class="content-group">
-      ${textBlocks
-        .map(
-          (block) => `
-          <article class="text-card" data-bind-path="text_blocks.${block.id}">
-            ${
-              block.label
-                ? `<div class="block-label" contenteditable="true" data-edit-type="block-label" data-block-id="${block.id}">${escapeHtml(block.label)}</div>`
-                : ""
-            }
-            <p contenteditable="true" data-edit-type="block-text" data-block-id="${block.id}">${escapeHtml(block.text)}</p>
-          </article>`
-        )
-        .join("")}
-    </section>
-  `;
-}
-
-function renderProcessSlide(slide) {
-  const steps = slide.process?.steps || [];
-  return `
-    <section class="process-grid">
-      ${steps
-        .map(
-          (step) => `
-        <article class="process-step">
-          <h4 contenteditable="true" data-edit-type="process-label" data-step-id="${step.id}">${escapeHtml(step.label)}</h4>
-          <p contenteditable="true" data-edit-type="process-description" data-step-id="${step.id}">${escapeHtml(step.description || "")}</p>
-          <div class="meta-row">
-            <span class="chip" contenteditable="true" data-edit-type="process-owner" data-step-id="${step.id}">${escapeHtml(step.owner || "Unassigned")}</span>
-          </div>
-        </article>
-      `
-        )
-        .join("")}
-    </section>
-    ${renderTextBlocks(slide.text_blocks)}
-  `;
-}
-
-function renderArchitectureSlide(slide) {
-  const layers = slide.architecture?.layers || [];
-  const integrations = slide.architecture?.integrations || [];
-
-  return `
-    <section class="architecture-stack">
-      ${layers
-        .map(
-          (layer) => `
-          <article class="arch-layer">
-            <h4 contenteditable="true" data-edit-type="layer-name" data-layer-id="${layer.id}">${escapeHtml(layer.name)}</h4>
-            <p contenteditable="true" data-edit-type="layer-responsibility" data-layer-id="${layer.id}">${escapeHtml(layer.responsibility)}</p>
-            <div class="token-row">
-              ${layer.components
-                .map(
-                  (component, index) =>
-                    `<span class="token" contenteditable="true" data-edit-type="layer-component" data-layer-id="${layer.id}" data-component-index="${index}">${escapeHtml(component)}</span>`
-                )
-                .join("")}
-            </div>
-          </article>
-        `
-        )
-        .join("")}
-    </section>
-    <section class="integration-list">
-      <h3>Integrations</h3>
-      ${integrations
-        .map(
-          (integration) => `
-          <article class="integration-item">
-            <strong contenteditable="true" data-edit-type="integration-system" data-integration-id="${integration.id}">${escapeHtml(integration.system)}</strong>
-            <p contenteditable="true" data-edit-type="integration-purpose" data-integration-id="${integration.id}">${escapeHtml(integration.purpose)}</p>
-          </article>
-        `
-        )
-        .join("")}
-    </section>
-    ${renderTextBlocks(slide.text_blocks)}
-  `;
-}
-
-function renderRoadmapSlide(slide) {
-  const phases = slide.roadmap?.phases || [];
-  return `
-    <section class="roadmap-grid">
-      ${phases
-        .map(
-          (phase) => `
-          <article class="roadmap-phase">
-            <h4 contenteditable="true" data-edit-type="phase-name" data-phase-id="${phase.id}">${escapeHtml(phase.name)}</h4>
-            <p contenteditable="true" data-edit-type="phase-objective" data-phase-id="${phase.id}">${escapeHtml(phase.objective)}</p>
-            <ul>
-              ${phase.milestones
-                .map(
-                  (milestone) => `
-                  <li>
-                    <span class="status ${milestone.status}">${escapeHtml(milestone.status.replaceAll("_", " "))}</span>
-                    <span contenteditable="true" data-edit-type="milestone-label" data-phase-id="${phase.id}" data-milestone-id="${milestone.id}">${escapeHtml(milestone.label)}</span>
-                    <small contenteditable="true" data-edit-type="milestone-period" data-phase-id="${phase.id}" data-milestone-id="${milestone.id}">${escapeHtml(milestone.target_period)}</small>
-                  </li>
-                `
-                )
-                .join("")}
-            </ul>
-          </article>
-      `
-        )
-        .join("")}
-    </section>
-    ${renderTextBlocks(slide.text_blocks)}
-  `;
-}
-
-function renderSwimlaneSlide(slide) {
-  const lanes = slide.swimlanes?.lanes || [];
-  return `
-    <section class="swimlane-grid">
-      ${lanes
-        .map(
-          (lane) => `
-          <article class="swimlane-row">
-            <h4 contenteditable="true" data-edit-type="swimlane-label" data-lane-id="${lane.id}">${escapeHtml(lane.lane_label)}</h4>
-            <div class="swimlane-items">
-              ${(lane.items || [])
-                .map(
-                  (item) => `
-                  <div class="swimlane-item">
-                    <strong contenteditable="true" data-edit-type="swimlane-item-label" data-lane-id="${lane.id}" data-item-id="${item.id}">${escapeHtml(item.label)}</strong>
-                    <p contenteditable="true" data-edit-type="swimlane-item-detail" data-lane-id="${lane.id}" data-item-id="${item.id}">${escapeHtml(item.detail || "")}</p>
-                  </div>
-                `
-                )
-                .join("")}
-            </div>
-          </article>
-        `
-        )
-        .join("")}
-    </section>
-    ${renderTextBlocks(slide.text_blocks)}
-  `;
+function renderJsonModel() {
+  jsonOutput.textContent = JSON.stringify(state.deck, null, 2);
 }
 
 function renderSlidePreview() {
   const slide = getSelectedSlide();
   if (!slide) {
-    slidePreview.innerHTML = "<p>Select a slide to begin.</p>";
+    slidePreview.innerHTML = "<p>Select a slide.</p>";
     return;
   }
-
   slideTitleLabel.textContent = `${slide.order}. ${slide.title}`;
-
-  let body = "";
-  if (slide.type === "process") body = renderProcessSlide(slide);
-  else if (slide.type === "architecture") body = renderArchitectureSlide(slide);
-  else if (slide.type === "roadmap") body = renderRoadmapSlide(slide);
-  else if (slide.type === "swimlane") body = renderSwimlaneSlide(slide);
-  else body = renderTextBlocks(slide.text_blocks);
-
-  slidePreview.innerHTML = `
-    <header class="slide-heading">
-      <h3 contenteditable="true" data-edit-type="slide-title">${escapeHtml(slide.title)}</h3>
-      <p contenteditable="true" data-edit-type="slide-objective">${escapeHtml(slide.objective || "")}</p>
-    </header>
-    ${body}
-  `;
-}
-
-function renderJsonModel() {
-  jsonOutput.textContent = JSON.stringify(appState.deck, null, 2);
+  slidePreview.innerHTML = renderSlideCanvas(slide);
+  applySelectionClass(slidePreview);
 }
 
 function refreshUi() {
-  renderPromptPanel();
   renderProjectGallery();
   renderDeckList();
+  renderPromptPanel();
   renderSlidePreview();
   renderJsonModel();
+  updateInspectorFromSelection(inspector);
 }
 
 function persistEdit(element) {
   const slide = getSelectedSlide();
   if (!slide) return;
-
   const textValue = element.textContent.trim();
   const editType = element.dataset.editType;
 
-  if (editType === "slide-title") {
-    slide.title = textValue;
-  } else if (editType === "slide-objective") {
-    slide.objective = textValue;
-  } else if (editType === "block-label") {
+  if (editType === "slide-title") slide.title = textValue;
+  else if (editType === "slide-objective") slide.objective = textValue;
+  else if (editType === "block-label") {
     const block = slide.text_blocks.find((item) => item.id === element.dataset.blockId);
     if (block) block.label = textValue;
   } else if (editType === "block-text") {
     const block = slide.text_blocks.find((item) => item.id === element.dataset.blockId);
     if (block) block.text = textValue;
-  } else if (editType === "process-label") {
-    const step = slide.process?.steps.find((item) => item.id === element.dataset.stepId);
-    if (step) step.label = textValue;
-  } else if (editType === "process-description") {
-    const step = slide.process?.steps.find((item) => item.id === element.dataset.stepId);
-    if (step) step.description = textValue;
-  } else if (editType === "process-owner") {
-    const step = slide.process?.steps.find((item) => item.id === element.dataset.stepId);
-    if (step) step.owner = textValue;
-  } else if (editType === "layer-name") {
-    const layer = slide.architecture?.layers.find((item) => item.id === element.dataset.layerId);
-    if (layer) layer.name = textValue;
-  } else if (editType === "layer-responsibility") {
-    const layer = slide.architecture?.layers.find((item) => item.id === element.dataset.layerId);
-    if (layer) layer.responsibility = textValue;
-  } else if (editType === "layer-component") {
-    const layer = slide.architecture?.layers.find((item) => item.id === element.dataset.layerId);
-    const index = Number(element.dataset.componentIndex);
-    if (layer && Number.isInteger(index) && index >= 0) layer.components[index] = textValue;
-  } else if (editType === "integration-system") {
-    const item = slide.architecture?.integrations.find((integration) => integration.id === element.dataset.integrationId);
-    if (item) item.system = textValue;
-  } else if (editType === "integration-purpose") {
-    const item = slide.architecture?.integrations.find((integration) => integration.id === element.dataset.integrationId);
-    if (item) item.purpose = textValue;
-  } else if (editType === "phase-name") {
-    const phase = slide.roadmap?.phases.find((item) => item.id === element.dataset.phaseId);
-    if (phase) phase.name = textValue;
-  } else if (editType === "phase-objective") {
-    const phase = slide.roadmap?.phases.find((item) => item.id === element.dataset.phaseId);
-    if (phase) phase.objective = textValue;
-  } else if (editType === "milestone-label") {
-    const phase = slide.roadmap?.phases.find((item) => item.id === element.dataset.phaseId);
-    const milestone = phase?.milestones.find((item) => item.id === element.dataset.milestoneId);
-    if (milestone) milestone.label = textValue;
-  } else if (editType === "milestone-period") {
-    const phase = slide.roadmap?.phases.find((item) => item.id === element.dataset.phaseId);
-    const milestone = phase?.milestones.find((item) => item.id === element.dataset.milestoneId);
-    if (milestone) milestone.target_period = textValue;
-  } else if (editType === "swimlane-label") {
-    const lane = slide.swimlanes?.lanes.find((item) => item.id === element.dataset.laneId);
-    if (lane) lane.lane_label = textValue;
-  } else if (editType === "swimlane-item-label") {
-    const lane = slide.swimlanes?.lanes.find((item) => item.id === element.dataset.laneId);
-    const item = lane?.items.find((entry) => entry.id === element.dataset.itemId);
-    if (item) item.label = textValue;
-  } else if (editType === "swimlane-item-detail") {
-    const lane = slide.swimlanes?.lanes.find((item) => item.id === element.dataset.laneId);
-    const item = lane?.items.find((entry) => entry.id === element.dataset.itemId);
-    if (item) item.detail = textValue;
   }
 
+  slide.user_modified = true;
   refreshUi();
 }
 
 async function loadDeck() {
-  try {
-    const response = await fetch("/api/semantic-deck");
-    appState.deck = await parseJsonResponse(response);
-    appState.selectedSlideId = appState.deck.slide_order[0];
-    projectNameInput.value = appState.deck.metadata?.title || "";
-    refreshUi();
-  } catch (error) {
-    setStatus(`Failed to load deck: ${error.message}`, true);
-  }
+  const response = await fetch("/api/semantic-deck");
+  state.deck = ensureDeckDefaults(await parseJsonResponse(response));
+  state.selectedSlideId = state.deck.slide_order[0];
+  projectNameInput.value = state.deck.metadata?.title || "";
+  refreshUi();
 }
 
 async function loadProjects() {
-  try {
-    const response = await fetch("/api/projects");
-    const payload = await parseJsonResponse(response);
-    appState.projects = payload.projects || [];
-    refreshUi();
-  } catch (error) {
-    setStatus(`Failed to load projects: ${error.message}`, true);
-  }
+  const response = await fetch("/api/projects");
+  state.projects = (await parseJsonResponse(response)).projects || [];
+  refreshUi();
 }
 
 async function saveDeck() {
-  if (!appState.deck) return;
-
-  const name = projectNameInput.value.trim() || appState.deck.metadata?.title || "Untitled Project";
-  saveButton.disabled = true;
-  saveButton.textContent = "Saving...";
-
-  try {
-    const response = await fetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, deck: appState.deck }),
-    });
-
-    const project = await parseJsonResponse(response);
-    appState.selectedProjectId = project.project_id;
-    await loadProjects();
-    setStatus("Project saved.");
-  } catch (error) {
-    setStatus(`Save failed: ${error.message}`, true);
-  } finally {
-    saveButton.disabled = false;
-    saveButton.textContent = "Save Project";
-  }
+  const name = projectNameInput.value.trim() || state.deck.metadata?.title || "Untitled Project";
+  const response = await fetch("/api/projects", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, deck: state.deck }),
+  });
+  const project = await parseJsonResponse(response);
+  state.selectedProjectId = project.project_id;
+  await loadProjects();
 }
 
 async function loadProject(projectId) {
-  try {
-    const response = await fetch(`/api/projects/${projectId}`);
-    const payload = await parseJsonResponse(response);
-    appState.deck = payload.deck;
-    appState.selectedSlideId = appState.deck.slide_order[0];
-    appState.selectedProjectId = payload.project_id;
-    projectNameInput.value = payload.name || "";
-    refreshUi();
-  } catch (error) {
-    setStatus(`Load failed: ${error.message}`, true);
-  }
+  const response = await fetch(`/api/projects/${projectId}`);
+  const payload = await parseJsonResponse(response);
+  state.deck = ensureDeckDefaults(payload.deck);
+  state.selectedSlideId = state.deck.slide_order[0];
+  state.selectedProjectId = payload.project_id;
+  refreshUi();
 }
 
-async function updatePrompt() {
-  if (!appState.deck) return;
-
-  updatePromptButton.disabled = true;
-  updatePromptButton.textContent = "Updating...";
-  try {
-    const response = await fetch("/api/semantic-deck/prompt", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_prompt: promptInput.value }),
-    });
-    appState.deck = await parseJsonResponse(response);
-    refreshUi();
-    setStatus("Prompt updated.");
-  } catch (error) {
-    setStatus(`Prompt update failed: ${error.message}`, true);
-  } finally {
-    updatePromptButton.disabled = false;
-    updatePromptButton.textContent = "Update prompt";
-  }
+function addSlide() {
+  const newId = `slide-${Date.now()}`;
+  state.deck.slides.push({
+    id: newId,
+    order: state.deck.slides.length + 1,
+    type: "content",
+    title: "New Slide",
+    objective: "",
+    text_blocks: [{ id: `tb-${Date.now()}`, role: "body", text: "Add content", style: { font_size: 16, font_weight: "regular", text_color: "#111827", text_align: "left", line_spacing: 1.2, padding: 8 } }],
+    visual_elements: [],
+    layout_hints: { grid_visible: true, safe_bounds_visible: true, snap_to_grid: true, show_guides: true, margin_x: 36, margin_y: 24, spacing_density: "standard", template_variant: "default" },
+  });
+  state.deck.slide_order.push(newId);
+  state.selectedSlideId = newId;
+  refreshUi();
 }
 
-async function regenerateDeck() {
-  if (!appState.deck) return;
-  regenerateDeckButton.disabled = true;
-  regenerateDeckButton.textContent = "Regenerating...";
-  try {
-    const response = await fetch("/api/semantic-deck/regenerate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_prompt: promptInput.value }),
-    });
-    appState.deck = await parseJsonResponse(response);
-    appState.selectedSlideId = appState.deck.slide_order[0];
-    refreshUi();
-    setStatus("Deck regenerated from prompt.");
-  } catch (error) {
-    setStatus(`Deck regeneration failed: ${error.message}`, true);
-  } finally {
-    regenerateDeckButton.disabled = false;
-    regenerateDeckButton.textContent = "Regenerate deck";
-  }
+function duplicateSlide() {
+  const slide = getSelectedSlide();
+  if (!slide) return;
+  const clone = structuredClone(slide);
+  clone.id = `${slide.id}-copy-${Date.now()}`;
+  clone.title = `${slide.title} (copy)`;
+  state.deck.slides.push(clone);
+  state.deck.slide_order.push(clone.id);
+  reindexSlides();
+  state.selectedSlideId = clone.id;
+  refreshUi();
 }
 
-async function regenerateSelectedSlide() {
-  if (!appState.deck || !appState.selectedSlideId) return;
-  regenerateSlideButton.disabled = true;
-  regenerateSlideButton.textContent = "Regenerating...";
-  try {
-    const response = await fetch("/api/semantic-deck/regenerate-slide", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        slide_id: appState.selectedSlideId,
-        user_prompt: promptInput.value,
-      }),
-    });
-    appState.deck = await parseJsonResponse(response);
-    refreshUi();
-    setStatus("Selected slide regenerated from prompt.");
-  } catch (error) {
-    setStatus(`Slide regeneration failed: ${error.message}`, true);
-  } finally {
-    regenerateSlideButton.disabled = false;
-    regenerateSlideButton.textContent = "Regenerate selected slide";
-  }
+function deleteSlide() {
+  if (state.deck.slides.length <= 1) return;
+  const id = state.selectedSlideId;
+  state.deck.slides = state.deck.slides.filter((slide) => slide.id !== id);
+  state.deck.slide_order = state.deck.slide_order.filter((slideId) => slideId !== id);
+  reindexSlides();
+  state.selectedSlideId = state.deck.slide_order[0];
+  refreshUi();
 }
 
-async function downloadExport(type) {
-  if (!appState.selectedProjectId) {
-    await saveDeck();
-  }
-
-  if (!appState.selectedProjectId) return;
-
-  try {
-    const response = await fetch(`/api/projects/${appState.selectedProjectId}/export/${type}`);
-    if (!response.ok) {
-      throw new Error(`${response.status} ${response.statusText}`);
-    }
-
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = type === "json" ? `${appState.selectedProjectId}.json` : `${appState.selectedProjectId}.pptx`;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    setStatus(`Exported ${type.toUpperCase()}.`);
-  } catch (error) {
-    setStatus(`Export failed: ${error.message}`, true);
-  }
+function reindexSlides() {
+  state.deck.slide_order.forEach((id, index) => {
+    const slide = state.deck.slides.find((item) => item.id === id);
+    if (slide) slide.order = index + 1;
+  });
 }
+
+document.getElementById("add-slide").addEventListener("click", addSlide);
+document.getElementById("duplicate-slide").addEventListener("click", duplicateSlide);
+document.getElementById("delete-slide").addEventListener("click", deleteSlide);
 
 deckList.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-slide-id]");
   if (!button) return;
-  appState.selectedSlideId = button.dataset.slideId;
+  state.selectedSlideId = button.dataset.slideId;
+  updateSelection(null);
   refreshUi();
 });
-
 projectGalleryList.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-load-project-id]");
   if (!button) return;
-  loadProject(button.dataset.loadProjectId);
+  loadProject(button.dataset.loadProjectId).catch((error) => setStatus(error.message, true));
+});
+slidePreview.addEventListener("blur", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement) || !target.dataset.editType) return;
+  persistEdit(target);
+}, true);
+
+saveButton.addEventListener("click", () => saveDeck().then(() => setStatus("Project saved.")).catch((error) => setStatus(error.message, true)));
+exportJsonButton.addEventListener("click", () => window.location.assign(`/api/projects/${state.selectedProjectId}/export/json`));
+exportPptxButton.addEventListener("click", () => window.location.assign(`/api/projects/${state.selectedProjectId}/export/pptx`));
+updatePromptButton.addEventListener("click", async () => {
+  const response = await fetch("/api/semantic-deck/prompt", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_prompt: promptInput.value }) });
+  state.deck = ensureDeckDefaults(await parseJsonResponse(response));
+  refreshUi();
+});
+regenerateDeckButton.addEventListener("click", async () => {
+  const response = await fetch("/api/semantic-deck/regenerate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_prompt: promptInput.value }) });
+  state.deck = ensureDeckDefaults(await parseJsonResponse(response));
+  refreshUi();
+});
+regenerateSlideButton.addEventListener("click", async () => {
+  const response = await fetch("/api/semantic-deck/regenerate-slide", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slide_id: state.selectedSlideId, user_prompt: promptInput.value }) });
+  state.deck = ensureDeckDefaults(await parseJsonResponse(response));
+  refreshUi();
 });
 
-slidePreview.addEventListener(
-  "blur",
-  (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement) || !target.dataset.editType) return;
-    persistEdit(target);
-  },
-  true
-);
+attachSelectionHandlers(slidePreview, () => {
+  applySelectionClass(slidePreview);
+  updateInspectorFromSelection(inspector);
+});
+attachInspectorHandlers(inspector, refreshUi);
+attachToolbarHandlers(toolbar, refreshUi);
 
-saveButton.addEventListener("click", saveDeck);
-exportJsonButton.addEventListener("click", () => downloadExport("json"));
-exportPptxButton.addEventListener("click", () => downloadExport("pptx"));
-updatePromptButton.addEventListener("click", updatePrompt);
-regenerateDeckButton.addEventListener("click", regenerateDeck);
-regenerateSlideButton.addEventListener("click", regenerateSelectedSlide);
-
-loadDeck();
-loadProjects();
+loadDeck().catch((error) => setStatus(`Failed to load deck: ${error.message}`, true));
+loadProjects().catch((error) => setStatus(`Failed to load projects: ${error.message}`, true));
