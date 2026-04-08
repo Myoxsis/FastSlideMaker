@@ -10,6 +10,8 @@ def _semantic_fixture() -> SemanticPresentation:
     return SemanticPresentation.model_validate(
         {
             "metadata": {"title": "Demo Deck", "audience": "Team", "purpose": "Review"},
+            "user_prompt": "Store fixture prompt",
+            "prompt_last_updated_at": "2026-01-01T00:00:00+00:00",
             "slide_order": ["s1"],
             "slides": [
                 {
@@ -38,6 +40,7 @@ def test_save_load_and_export_json(tmp_path: Path) -> None:
     assert loaded["project_id"] == saved["project_id"]
     assert loaded["name"] == "Demo"
     assert loaded["deck"]["metadata"]["title"] == "Demo Deck"
+    assert loaded["deck"]["user_prompt"] == "Store fixture prompt"
     assert exported.exists()
     assert exported.read_text(encoding="utf-8").startswith("{")
 

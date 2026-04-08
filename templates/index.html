@@ -23,6 +23,21 @@
 
       <section class="workspace">
         <aside class="deck-panel" aria-label="Slide list">
+          <section class="prompt-panel">
+            <h3>Prompt</h3>
+            <textarea
+              id="prompt-input"
+              rows="8"
+              placeholder="Enter the source prompt for this deck..."
+              aria-label="Current generation prompt"
+            ></textarea>
+            <small id="prompt-updated-at" class="muted"></small>
+            <div class="prompt-actions">
+              <button id="update-prompt" type="button">Update prompt</button>
+              <button id="regenerate-deck" type="button">Regenerate deck</button>
+              <button id="regenerate-slide" type="button">Regenerate selected slide</button>
+            </div>
+          </section>
           <h2>Deck</h2>
           <div class="project-gallery">
             <h3>Project Gallery</h3>

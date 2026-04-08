@@ -297,6 +297,8 @@ class SemanticPresentation(BaseModel):
     metadata: PresentationMetadata
     slides: list[SemanticSlide] = Field(..., min_length=1, max_length=500)
     slide_order: list[str] = Field(..., min_length=1, max_length=500)
+    user_prompt: str = Field(default="", max_length=8000)
+    prompt_last_updated_at: str | None = None
 
     @model_validator(mode="after")
     def validate_slide_order(self) -> "SemanticPresentation":
@@ -320,7 +322,13 @@ class SemanticPresentation(BaseModel):
     def normalized(self) -> "SemanticPresentation":
         normalized_slides = [slide.normalized() for slide in self.slides]
         normalized_slides.sort(key=lambda item: self.slide_order.index(item.id))
-        return self.model_copy(deep=True, update={"slides": normalized_slides})
+        return self.model_copy(
+            deep=True,
+            update={
+                "slides": normalized_slides,
+                "user_prompt": self.user_prompt.strip(),
+            },
+        )
 
 
 # -----------------------
