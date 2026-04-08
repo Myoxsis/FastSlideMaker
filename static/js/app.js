@@ -2,6 +2,7 @@ import { ensureDeckDefaults, getSelectedSlide, state, updateSelection } from "./
 import { applySelectionClass, attachSelectionHandlers } from "./selection_manager.js";
 import { attachInspectorHandlers, updateInspectorFromSelection } from "./inspector.js";
 import { attachToolbarHandlers } from "./toolbar.js";
+import { attachCanvasManipulationHandlers } from "./canvas_manipulation.js";
 
 const deckList = document.getElementById("deck-list");
 const slidePreview = document.getElementById("slide-preview");
@@ -266,6 +267,14 @@ attachSelectionHandlers(slidePreview, () => {
   applySelectionClass(slidePreview);
   updateInspectorFromSelection(inspector);
 });
+attachCanvasManipulationHandlers(
+  slidePreview,
+  () => {
+    applySelectionClass(slidePreview);
+    updateInspectorFromSelection(inspector);
+  },
+  refreshUi
+);
 attachInspectorHandlers(inspector, refreshUi);
 attachToolbarHandlers(toolbar, refreshUi);
 
