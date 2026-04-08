@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fast Slide Maker</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Fast Slide Maker</h1>
+      <p>JSON-first slide generation for process and solution design.</p>
+    </header>
+
+    <section class="controls">
+      <textarea id="prompt" rows="3">Create a 5-slide deck explaining the lead-to-cash process and the target solution architecture.</textarea>
+      <div class="row">
+        <input id="model" value="llama3" />
+        <button id="generateBtn">Generate Deck</button>
+        <button id="exportBtn" disabled>Export PPTX</button>
+      </div>
+      <pre id="status"></pre>
+    </section>
+
+    <section>
+      <h2>Rendered Preview</h2>
+      <div id="slides"></div>
+    </section>
+
+    <section>
+      <h2>Semantic JSON (source of truth)</h2>
+      <pre id="jsonOutput"></pre>
+    </section>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

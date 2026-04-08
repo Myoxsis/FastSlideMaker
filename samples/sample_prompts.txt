@@ -1,0 +1,3 @@
+Create a 5-slide deck explaining the lead-to-cash process and the target solution architecture.
+Create a 6-slide deck on procure-to-pay pain points and modernization roadmap.
+Create a 4-slide deck comparing current CRM integrations with a target API-led architecture.

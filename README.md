@@ -1,55 +1,48 @@
-# Fast Slide Maker (Offline, Ollama-powered)
+# FastSlideMaker
 
-Local web app focused on a **minimal PowerPoint-like editor first**, with optional AI assistance for slide generation.
+FastSlideMaker is a local-first app that generates business-quality slides from prompts for process and IT solution design use cases.
 
-## What this app does
+## Core design
 
-- Provides a manual canvas with essential editing controls:
-  - Add and edit text boxes
-  - Add images
-  - Add basic forms/shapes (rectangle, circle, diamond)
-  - Change fill, text, and border colors
-  - Drag elements to position them on a slide
-- Takes a user prompt and can generate a structured presentation plan (optional).
-- Enforces a JSON-first workflow (no free text output from LLM).
-- Validates/normalizes slide schema before rendering.
-- Uses deterministic layout templates for predictable visual quality.
-- Supports editing + single-slide regeneration in-browser.
-- Can ingest an existing `.pptx` deck as optional reference context for the LLM.
-- Works offline with **Ollama**, and falls back to a mock generator if Ollama is unavailable.
+- Uses an LLM (Ollama) to generate **semantic JSON**.
+- Semantic JSON is the **source of truth**.
+- Frontend renders deterministic HTML previews from JSON.
+- Exporter maps JSON to **native editable PPTX objects** (text boxes, shapes, connectors).
+- No screenshot-based export and no arbitrary HTML-to-PPT conversion.
 
-## Tech stack
+## Stack
 
-- Backend: FastAPI (Python)
-- Frontend: HTML/CSS/Vanilla JS
-- LLM runtime: local Ollama (`http://localhost:11434`)
+- Backend: FastAPI + Python
+- Frontend: HTML/CSS/vanilla JS
+- LLM: local Ollama HTTP endpoint (`http://localhost:11434`)
+- Export: `python-pptx`
 
-## Project structure
+## Required modules implemented
 
-- `app.py` - FastAPI app + API routes
-- `llm_client.py` - Ollama integration + fallback mock client
-- `prompt_parser.py` - system/user prompt templates
-- `slide_planner.py` - schema models + validation + template selection
-- `layout_engine.py` - deterministic layout rules
-- `project_store.py` - local save/load utilities
-- `templates/` - UI + template placeholders
-- `static/` - styles and frontend logic
-- `samples/` - sample JSON output
+- `request_interpreter.py`
+- `deck_planner.py`
+- `slide_generator.py`
+- `llm_client.py`
+- `schema.py`
+- `validator.py`
+- `layout_engine.py`
+- `pptx_exporter.py`
+- `project_store.py`
+- `app.py`
+- `templates/`
+- `static/`
+- `samples/`
 
-## Ollama setup
+## Supported slide types
 
-1. Install Ollama (Linux/macOS/Windows):
-   - https://ollama.com/download
-2. Start Ollama service (if not auto-started):
-   ```bash
-   ollama serve
-   ```
-3. Pull a local model (example):
-   ```bash
-   ollama pull llama3
-   ```
-
-You can switch models in the UI (`mistral`, `llama3`, etc.).
+- `executive_summary`
+- `process_flow`
+- `swimlane`
+- `current_vs_target`
+- `layered_architecture`
+- `integration_map`
+- `roadmap`
+- `issue_implication_recommendation`
 
 ## Run locally
 
@@ -60,25 +53,36 @@ pip install -r requirements.txt
 uvicorn app:app --reload
 ```
 
-Open: `http://127.0.0.1:8000`
+Open `http://127.0.0.1:8000`.
 
-## Usage flow
+## Typical flow
 
-1. Build slides manually from the center toolbar (`+ Text`, `+ Rectangle`, `+ Circle`, `+ Diamond`, `+ Image`).
-2. Select elements to update text and colors.
-3. Drag elements on the canvas to position them.
-4. Enter prompt in Copilot tab only if you want AI-generated slides.
-5. (Optional) Upload an existing `.pptx` in Copilot tab to provide reference context.
-6. Click **Generate Deck** when needed.
-7. Save/load projects and export JSON.
+1. Enter prompt (e.g., "Create a 5-slide deck explaining the lead-to-cash process and the target solution architecture").
+2. Backend interprets request and builds a deck plan.
+3. LLM generates semantic JSON (or mock fallback if Ollama is unavailable).
+4. Validator normalizes JSON to schema.
+5. UI renders HTML previews.
+6. Export endpoint generates editable PPTX.
 
-## Example prompt
+## API endpoints
 
-> Create a 6-slide deck explaining the order-to-cash process and the target IT solution architecture.
+- `POST /api/generate` - generate and save deck
+- `GET /api/projects` - list projects
+- `GET /api/projects/{project_id}` - fetch project JSON
+- `GET /api/projects/{project_id}/preview` - deterministic preview view model
+- `GET /api/projects/{project_id}/export` - download PPTX
 
-## Notes on architecture decisions
+## Samples
 
-- LLM does **content understanding only**.
-- Layout is **rule-based and deterministic** (`layout_engine.py`).
-- Backend validates output with Pydantic before sending to UI.
-- When Ollama is down, app continues in mock mode for end-to-end usability.
+- Prompt examples: `samples/sample_prompts.txt`
+- Example semantic JSON: `samples/sample_generated_deck.json`
+- Saved projects and exports are written under `samples/projects/` and `samples/exports/`
+
+## Notes
+
+- The LLM does not control coordinates.
+- Layout and export are deterministic and template-driven.
+- Template-rich rendering is implemented for:
+  - `process_flow`
+  - `layered_architecture`
+  - `roadmap`

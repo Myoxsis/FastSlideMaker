@@ -1,0 +1,47 @@
+{
+  "request": "Create a 5-slide deck explaining the lead-to-cash process and the target solution architecture.",
+  "model": "llama3",
+  "plan": {
+    "objective": "a 5-slide deck explaining the lead-to-cash process and the target solution architecture",
+    "audience": "Business and IT stakeholders",
+    "slide_count": 5,
+    "slide_types": [
+      "executive_summary",
+      "process_flow",
+      "swimlane",
+      "current_vs_target",
+      "layered_architecture"
+    ]
+  },
+  "slides": [
+    {
+      "id": "slide_1",
+      "slide_type": "executive_summary",
+      "title": "Executive Summary",
+      "subtitle": "Business outcomes",
+      "narrative": [
+        "Lead-to-cash cycle has handoff delays between sales and fulfillment.",
+        "Target solution reduces cycle time with guided quoting and orchestration."
+      ],
+      "metadata": {
+        "theme": "blue_enterprise"
+      }
+    },
+    {
+      "id": "slide_2",
+      "slide_type": "process_flow",
+      "title": "Lead-to-Cash Process",
+      "subtitle": "End-to-end flow",
+      "flow_steps": [
+        {"id": "s1", "title": "Lead", "detail": "Capture and qualify"},
+        {"id": "s2", "title": "Quote", "detail": "Configure pricing"},
+        {"id": "s3", "title": "Order", "detail": "Validate and submit"},
+        {"id": "s4", "title": "Cash", "detail": "Invoice and collect"}
+      ],
+      "metadata": {
+        "theme": "blue_enterprise"
+      }
+    }
+  ],
+  "warnings": []
+}
