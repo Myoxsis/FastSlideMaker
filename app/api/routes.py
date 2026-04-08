@@ -2,16 +2,31 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse
+from pydantic import BaseModel, Field
 
 from app.models.schemas import DeckRequest, DeckResponse, MilestoneStatus, SemanticPresentation, SlideType, TextRole
 from app.services.export import ExportService
 from app.services.generation import GenerationService
 from app.services.rendering import RenderingService
 from app.services.validation import ValidationService
+from project_store import ProjectStore
 
 router = APIRouter()
+
+
+class SaveProjectRequest(BaseModel):
+    name: str = Field(default="Untitled Project", max_length=120)
+    deck: SemanticPresentation
+
+
+def _project_store(request: Request) -> ProjectStore:
+    if not hasattr(request.app.state, "project_store"):
+        request.app.state.project_store = ProjectStore()
+    return request.app.state.project_store
 
 
 def _build_default_semantic_deck() -> SemanticPresentation:
@@ -213,6 +228,57 @@ async def update_semantic_deck(payload: SemanticPresentation, request: Request) 
     normalized = payload.normalized()
     request.app.state.semantic_preview_deck = normalized
     return normalized
+
+
+@router.get("/api/projects")
+async def list_projects(request: Request) -> dict:
+    project_store = _project_store(request)
+    projects = [item.__dict__ for item in project_store.list_projects()]
+    return {"projects": projects}
+
+
+@router.get("/api/projects/{project_id}")
+async def load_project(project_id: str, request: Request) -> dict:
+    project_store = _project_store(request)
+    try:
+        payload = project_store.load_project(project_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    request.app.state.semantic_preview_deck = SemanticPresentation.model_validate(payload["deck"])
+    return payload
+
+
+@router.post("/api/projects")
+async def save_project(payload: SaveProjectRequest, request: Request) -> dict:
+    project_store = _project_store(request)
+    return project_store.save_project(payload.name, payload.deck)
+
+
+@router.get("/api/projects/{project_id}/export/json")
+async def export_project_json(project_id: str, request: Request) -> FileResponse:
+    project_store = _project_store(request)
+    try:
+        output = project_store.export_project_json(project_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return FileResponse(path=output, filename=output.name, media_type="application/json")
+
+
+@router.get("/api/projects/{project_id}/export/pptx")
+async def export_project_pptx(project_id: str, request: Request) -> FileResponse:
+    project_store = _project_store(request)
+    try:
+        output = project_store.export_project_pptx(project_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return FileResponse(
+        path=output,
+        filename=Path(output).name,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    )
 
 
 @router.post("/api/generate", response_model=DeckResponse)

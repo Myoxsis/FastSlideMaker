@@ -1,0 +1,231 @@
+{
+  "project_id": "sample-enterprise-delivery-plan",
+  "name": "Enterprise Delivery Plan",
+  "created_at": "2026-04-08T18:21:47.009190+00:00",
+  "updated_at": "2026-04-08T18:21:47.009190+00:00",
+  "deck": {
+    "metadata": {
+      "title": "Enterprise Delivery Plan",
+      "subtitle": "Operational readiness and execution blueprint",
+      "subject": null,
+      "audience": "Executive Leadership",
+      "purpose": "Align teams on delivery design and milestones",
+      "author": null,
+      "language": "en-US",
+      "version": "1.0",
+      "tags": []
+    },
+    "slides": [
+      {
+        "id": "process-flow",
+        "order": 1,
+        "type": "process",
+        "title": "Process Flow",
+        "objective": "Clarify the deterministic delivery lifecycle from intake through release.",
+        "text_blocks": [
+          {
+            "id": "process-context",
+            "role": "callout",
+            "label": "Operating Model",
+            "text": "Each phase has an explicit owner and a measurable handoff."
+          }
+        ],
+        "diagram": null,
+        "process": {
+          "steps": [
+            {
+              "id": "discover",
+              "label": "Discover",
+              "description": "Capture requirements and constraints.",
+              "owner": "Product",
+              "outputs": [
+                "Scope",
+                "Prioritized backlog"
+              ]
+            },
+            {
+              "id": "design",
+              "label": "Design",
+              "description": "Define architecture and implementation plan.",
+              "owner": "Architecture",
+              "outputs": [
+                "Design spec",
+                "Delivery plan"
+              ]
+            },
+            {
+              "id": "build",
+              "label": "Build",
+              "description": "Implement features and validate quality.",
+              "owner": "Engineering",
+              "outputs": [
+                "Validated build",
+                "Test evidence"
+              ]
+            },
+            {
+              "id": "release",
+              "label": "Release",
+              "description": "Deploy in controlled waves and monitor outcomes.",
+              "owner": "Operations",
+              "outputs": [
+                "Production release",
+                "Post-launch report"
+              ]
+            }
+          ]
+        },
+        "swimlanes": null,
+        "architecture": null,
+        "integrations": [],
+        "roadmap": null,
+        "issue_implication_recommendation": null,
+        "MAX_TEXT_CHARS": 1200,
+        "MAX_DENSITY_ITEMS": 24
+      },
+      {
+        "id": "layered-architecture",
+        "order": 2,
+        "type": "architecture",
+        "title": "Layered Architecture",
+        "objective": "Show clear separation of concerns across platform layers.",
+        "text_blocks": [
+          {
+            "id": "arch-principle",
+            "role": "callout",
+            "label": "Design Principle",
+            "text": "Interfaces are stable, implementations can evolve independently."
+          }
+        ],
+        "diagram": null,
+        "process": null,
+        "swimlanes": null,
+        "architecture": {
+          "layers": [
+            {
+              "id": "experience",
+              "name": "Experience Layer",
+              "responsibility": "Handles user interactions and accessibility.",
+              "components": [
+                "Web UI",
+                "Template Renderer",
+                "Editor Controls"
+              ]
+            },
+            {
+              "id": "application",
+              "name": "Application Layer",
+              "responsibility": "Coordinates workflows and business rules.",
+              "components": [
+                "Slide Controller",
+                "Validation Service",
+                "Export Orchestrator"
+              ]
+            },
+            {
+              "id": "data",
+              "name": "Data Layer",
+              "responsibility": "Stores semantic models and artifacts.",
+              "components": [
+                "Semantic JSON Store",
+                "Versioned Snapshots",
+                "Asset Catalog"
+              ]
+            }
+          ],
+          "integrations": [
+            {
+              "id": "llm",
+              "system": "LLM Provider",
+              "purpose": "Generate draft narrative suggestions.",
+              "direction": "outbound",
+              "protocol": "HTTPS"
+            },
+            {
+              "id": "storage",
+              "system": "Object Storage",
+              "purpose": "Persist exports and metadata.",
+              "direction": "bidirectional",
+              "protocol": "S3 API"
+            }
+          ]
+        },
+        "integrations": [],
+        "roadmap": null,
+        "issue_implication_recommendation": null,
+        "MAX_TEXT_CHARS": 1200,
+        "MAX_DENSITY_ITEMS": 24
+      },
+      {
+        "id": "roadmap",
+        "order": 3,
+        "type": "roadmap",
+        "title": "Roadmap",
+        "objective": "Sequence rollout outcomes by quarter.",
+        "text_blocks": [
+          {
+            "id": "roadmap-note",
+            "role": "callout",
+            "label": "Success Metric",
+            "text": "Achieve predictable release cadence and reduce cycle time by 30%."
+          }
+        ],
+        "diagram": null,
+        "process": null,
+        "swimlanes": null,
+        "architecture": null,
+        "integrations": [],
+        "roadmap": {
+          "phases": [
+            {
+              "id": "q2",
+              "name": "Q2 Foundations",
+              "objective": "Establish reliable data and publishing pipelines.",
+              "milestones": [
+                {
+                  "id": "schema",
+                  "label": "Semantic schema finalized",
+                  "status": "complete",
+                  "target_period": "Apr 2026"
+                },
+                {
+                  "id": "preview",
+                  "label": "Preview renderer delivered",
+                  "status": "in_progress",
+                  "target_period": "May 2026"
+                }
+              ]
+            },
+            {
+              "id": "q3",
+              "name": "Q3 Scale",
+              "objective": "Expand templates and harden collaboration workflows.",
+              "milestones": [
+                {
+                  "id": "templates",
+                  "label": "Add 8 deterministic slide templates",
+                  "status": "planned",
+                  "target_period": "Jul 2026"
+                },
+                {
+                  "id": "review",
+                  "label": "Stakeholder review workflow",
+                  "status": "planned",
+                  "target_period": "Aug 2026"
+                }
+              ]
+            }
+          ]
+        },
+        "issue_implication_recommendation": null,
+        "MAX_TEXT_CHARS": 1200,
+        "MAX_DENSITY_ITEMS": 24
+      }
+    ],
+    "slide_order": [
+      "process-flow",
+      "layered-architecture",
+      "roadmap"
+    ]
+  }
+}

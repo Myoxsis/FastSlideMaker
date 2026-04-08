@@ -1,6 +1,8 @@
 const appState = {
   deck: null,
   selectedSlideId: null,
+  selectedProjectId: null,
+  projects: [],
 };
 
 const deckList = document.getElementById("deck-list");
@@ -8,6 +10,10 @@ const slidePreview = document.getElementById("slide-preview");
 const slideTitleLabel = document.getElementById("slide-title-label");
 const jsonOutput = document.getElementById("json-output");
 const saveButton = document.getElementById("save-deck");
+const exportJsonButton = document.getElementById("export-json");
+const exportPptxButton = document.getElementById("export-pptx");
+const projectNameInput = document.getElementById("project-name");
+const projectGalleryList = document.getElementById("project-gallery-list");
 
 function escapeHtml(value) {
   return String(value)
@@ -21,6 +27,27 @@ function escapeHtml(value) {
 function getSelectedSlide() {
   if (!appState.deck || !appState.selectedSlideId) return null;
   return appState.deck.slides.find((slide) => slide.id === appState.selectedSlideId) || null;
+}
+
+function renderProjectGallery() {
+  if (!appState.projects.length) {
+    projectGalleryList.innerHTML = "<li><small class=\"muted\">No saved projects yet.</small></li>";
+    return;
+  }
+
+  projectGalleryList.innerHTML = appState.projects
+    .map(
+      (project) => `
+      <li class="project-item">
+        <div>
+          <strong>${escapeHtml(project.name)}</strong>
+          <small>${escapeHtml(project.source)} · ${escapeHtml(project.updated_at || "")}</small>
+        </div>
+        <button type="button" data-load-project-id="${project.project_id}">Load</button>
+      </li>
+    `
+    )
+    .join("");
 }
 
 function renderDeckList() {
@@ -194,6 +221,7 @@ function renderJsonModel() {
 }
 
 function refreshUi() {
+  renderProjectGallery();
   renderDeckList();
   renderSlidePreview();
   renderJsonModel();
@@ -264,23 +292,68 @@ async function loadDeck() {
   const response = await fetch("/api/semantic-deck");
   appState.deck = await response.json();
   appState.selectedSlideId = appState.deck.slide_order[0];
+  projectNameInput.value = appState.deck.metadata?.title || "";
+  refreshUi();
+}
+
+async function loadProjects() {
+  const response = await fetch("/api/projects");
+  const payload = await response.json();
+  appState.projects = payload.projects || [];
   refreshUi();
 }
 
 async function saveDeck() {
+  if (!appState.deck) return;
+
+  const name = projectNameInput.value.trim() || appState.deck.metadata?.title || "Untitled Project";
   saveButton.disabled = true;
   saveButton.textContent = "Saving...";
 
-  const response = await fetch("/api/semantic-deck", {
-    method: "PUT",
+  const response = await fetch("/api/projects", {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(appState.deck),
+    body: JSON.stringify({ name, deck: appState.deck }),
   });
 
-  appState.deck = await response.json();
+  const project = await response.json();
+  appState.selectedProjectId = project.project_id;
   saveButton.disabled = false;
-  saveButton.textContent = "Save JSON Model";
+  saveButton.textContent = "Save Project";
+  await loadProjects();
+}
+
+async function loadProject(projectId) {
+  const response = await fetch(`/api/projects/${projectId}`);
+  if (!response.ok) return;
+
+  const payload = await response.json();
+  appState.deck = payload.deck;
+  appState.selectedSlideId = appState.deck.slide_order[0];
+  appState.selectedProjectId = payload.project_id;
+  projectNameInput.value = payload.name || "";
   refreshUi();
+}
+
+async function downloadExport(type) {
+  if (!appState.selectedProjectId) {
+    await saveDeck();
+  }
+
+  if (!appState.selectedProjectId) return;
+
+  const response = await fetch(`/api/projects/${appState.selectedProjectId}/export/${type}`);
+  if (!response.ok) return;
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = type === "json" ? `${appState.selectedProjectId}.json` : `${appState.selectedProjectId}.pptx`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 deckList.addEventListener("click", (event) => {
@@ -290,12 +363,25 @@ deckList.addEventListener("click", (event) => {
   refreshUi();
 });
 
-slidePreview.addEventListener("blur", (event) => {
-  const target = event.target;
-  if (!(target instanceof HTMLElement) || !target.dataset.editType) return;
-  persistEdit(target);
-}, true);
+projectGalleryList.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-load-project-id]");
+  if (!button) return;
+  loadProject(button.dataset.loadProjectId);
+});
+
+slidePreview.addEventListener(
+  "blur",
+  (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement) || !target.dataset.editType) return;
+    persistEdit(target);
+  },
+  true
+);
 
 saveButton.addEventListener("click", saveDeck);
+exportJsonButton.addEventListener("click", () => downloadExport("json"));
+exportPptxButton.addEventListener("click", () => downloadExport("pptx"));
 
 loadDeck();
+loadProjects();
