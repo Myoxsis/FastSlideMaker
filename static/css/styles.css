@@ -1,46 +1,247 @@
 :root {
   color-scheme: light;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: Inter, "Segoe UI", Roboto, sans-serif;
+  --bg: #f3f5f9;
+  --panel: #ffffff;
+  --ink: #162033;
+  --muted: #5f6b80;
+  --line: #dbe1eb;
+  --accent: #2155d6;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  background: #f5f7fb;
-  color: #1f2a37;
+  background: var(--bg);
+  color: var(--ink);
 }
 
-main {
-  max-width: 800px;
-  margin: 2rem auto;
-  background: #fff;
+.app-shell {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+}
+
+.app-header {
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 1.5rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-label,
-input,
-select,
-button,
-textarea {
-  display: block;
-  width: 100%;
-  margin-top: 0.5rem;
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+.app-header p,
+.muted,
+small {
+  color: var(--muted);
 }
 
 button {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  border: 0;
+  border: 1px solid #b7c4dc;
+  background: #f9fbff;
+  color: var(--ink);
   border-radius: 8px;
-  background: #1f6feb;
-  color: #fff;
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
-pre {
-  background: #0f172a;
-  color: #f8fafc;
-  padding: 1rem;
+.workspace {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 16px;
+  min-height: 620px;
+}
+
+.deck-panel,
+.slide-panel,
+.json-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+#deck-list {
+  list-style: none;
+  padding: 12px 0 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.deck-item {
+  width: 100%;
+  text-align: left;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+  align-items: center;
+  background: #fff;
+}
+
+.deck-item-order {
+  display: inline-grid;
+  place-items: center;
+  height: 24px;
+  width: 24px;
+  border-radius: 999px;
+  background: #eef2fb;
+  color: #2a3d68;
+  font-size: 12px;
+}
+
+.deck-item.active {
+  border-color: var(--accent);
+  background: #edf3ff;
+}
+
+.deck-item small {
+  display: block;
+  margin-top: 3px;
+  text-transform: capitalize;
+}
+
+.slide-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.slide-preview {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  min-height: 520px;
+  padding: 28px;
+  display: grid;
+  gap: 20px;
+  background: linear-gradient(180deg, #fff, #fafcff);
+}
+
+.slide-heading {
+  display: grid;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+}
+
+[contenteditable="true"] {
+  border-radius: 4px;
+  outline: none;
+}
+
+[contenteditable="true"]:focus {
+  box-shadow: 0 0 0 2px #bfd1ff;
+  background: #f8fbff;
+}
+
+.process-grid,
+.roadmap-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.process-step,
+.roadmap-phase,
+.arch-layer,
+.integration-item,
+.text-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  background: #fff;
+}
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip,
+.token,
+.status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid #cfd9ee;
+  background: #f5f8ff;
+}
+
+.architecture-stack,
+.content-group,
+.integration-list {
+  display: grid;
+  gap: 10px;
+}
+
+.token-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.roadmap-phase ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.roadmap-phase li {
+  display: grid;
+  gap: 4px;
+}
+
+.status.complete {
+  background: #e9f9ef;
+  border-color: #b6e7c5;
+}
+
+.status.in_progress {
+  background: #e9f0ff;
+  border-color: #bfd2ff;
+}
+
+.status.planned {
+  background: #f3f3f3;
+  border-color: #e0e0e0;
+}
+
+.block-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #40506d;
+}
+
+.json-panel pre {
+  margin: 10px 0 0;
+  background: #0f1a2e;
+  color: #e6edff;
   border-radius: 8px;
+  padding: 14px;
+  max-height: 260px;
   overflow: auto;
 }
