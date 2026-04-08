@@ -1,0 +1,21 @@
+{
+  "input": "Create a deck for enterprise CRM modernization solution design for executive leadership. Include architecture and rollout milestones.",
+  "output": {
+    "topic": "enterprise CRM modernization solution design for executive leadership",
+    "audience": "Executive stakeholders",
+    "deck_objective": "Present process and architecture options with a practical rollout path. Audience: Executive stakeholders. Topic: enterprise CRM modernization solution design for executive leadership.",
+    "likely_slide_count": 9,
+    "recommended_slide_types": [
+      "title",
+      "agenda",
+      "content",
+      "process",
+      "architecture",
+      "integrations",
+      "roadmap",
+      "summary"
+    ],
+    "tone": "Executive concise",
+    "request_kind": "mixed"
+  }
+}
