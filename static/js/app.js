@@ -15,24 +15,41 @@ const projectNameInput = document.getElementById("project-name");
 const projectGalleryList = document.getElementById("project-gallery-list");
 const promptInput = document.getElementById("prompt-input");
 const promptUpdatedAt = document.getElementById("prompt-updated-at");
+const intentSummary = document.getElementById("intent-summary");
 const updatePromptButton = document.getElementById("update-prompt");
+const generateDeckButton = document.getElementById("generate-deck");
 const regenerateDeckButton = document.getElementById("regenerate-deck");
+const refinePromptButton = document.getElementById("refine-prompt");
 const regenerateSlideButton = document.getElementById("regenerate-slide");
 const toolbar = document.getElementById("editor-toolbar");
 const inspector = document.getElementById("inspector-panel");
+const statusMessage = document.getElementById("status-message");
+const slideCountLabel = document.getElementById("slide-count-label");
+const zoomLabel = document.getElementById("zoom-label");
+const zoomInButton = document.getElementById("zoom-in");
+const zoomOutButton = document.getElementById("zoom-out");
+const undoButton = document.getElementById("undo-action");
+const redoButton = document.getElementById("redo-action");
 
+const history = { past: [], future: [] };
 let statusTimeout = null;
+let promptUpdateDebounce = null;
+let zoomLevel = 1;
 
-function setStatus(message, isError = false) {
+function setStatus(message, type = "success") {
   if (!message) return;
   clearTimeout(statusTimeout);
-  slideTitleLabel.textContent = message;
-  slideTitleLabel.style.color = isError ? "#b42318" : "";
+  statusMessage.textContent = message;
+  statusMessage.className = `status-message visible ${type}`;
   statusTimeout = setTimeout(() => {
-    const slide = getSelectedSlide();
-    slideTitleLabel.textContent = slide ? `${slide.order}. ${slide.title}` : "";
-    slideTitleLabel.style.color = "";
-  }, 2600);
+    statusMessage.className = "status-message";
+    statusMessage.textContent = "";
+  }, 2200);
+}
+
+function setLoading(loading, message = "Generating slides...") {
+  if (!loading) return;
+  slidePreview.innerHTML = `<div class="skeleton" aria-label="Loading">${message}</div>`;
 }
 
 async function parseJsonResponse(response) {
@@ -49,24 +66,48 @@ async function parseJsonResponse(response) {
 
 const escapeHtml = (value) => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 
+function commitHistory() {
+  if (!state.deck) return;
+  history.past.push(structuredClone(state.deck));
+  if (history.past.length > 40) history.past.shift();
+  history.future = [];
+}
+
+function applyHistorySnapshot(snapshot) {
+  if (!snapshot) return;
+  state.deck = ensureDeckDefaults(structuredClone(snapshot));
+  if (!state.deck.slide_order.includes(state.selectedSlideId)) state.selectedSlideId = state.deck.slide_order[0] || null;
+  refreshUi();
+}
+
 function renderProjectGallery() {
   if (!state.projects.length) {
-    projectGalleryList.innerHTML = '<li><small class="muted">No saved projects yet.</small></li>';
+    projectGalleryList.innerHTML = '<li><small class="muted">No project loaded. Save one to continue quickly.</small></li>';
     return;
   }
   projectGalleryList.innerHTML = state.projects
-    .map((project) => `<li class="project-item"><div><strong>${escapeHtml(project.name)}</strong><small>${escapeHtml(project.source)} · ${escapeHtml(project.updated_at || "")}</small></div><button type="button" data-load-project-id="${project.project_id}">Load</button></li>`)
+    .map((project) => `<li class="project-item"><div><strong>${escapeHtml(project.name)}</strong><small class="muted">${escapeHtml(project.updated_at || "")}</small></div><button type="button" class="btn" data-load-project-id="${project.project_id}">Load</button></li>`)
     .join("");
 }
 
 function renderDeckList() {
-  if (!state.deck) return;
+  if (!state.deck?.slides?.length) {
+    deckList.innerHTML = '<li class="panel-soft"><strong>Generate your first deck</strong><small class="muted">Use the toolbar prompt actions to create slides.</small></li>';
+    slideCountLabel.textContent = "0 slides";
+    return;
+  }
+
+  slideCountLabel.textContent = `${state.deck.slide_order.length} slides`;
   deckList.innerHTML = state.deck.slide_order
     .map((slideId) => state.deck.slides.find((item) => item.id === slideId))
     .filter(Boolean)
-    .map(
-      (slide) => `<li><button class="deck-item ${slide.id === state.selectedSlideId ? "active" : ""}" data-slide-id="${slide.id}"><span class="deck-item-order">${slide.order}</span><span><strong>${escapeHtml(slide.title)}</strong><small>${escapeHtml(slide.type.replaceAll("_", " "))}</small></span></button></li>`
-    )
+    .map((slide) => {
+      const active = slide.id === state.selectedSlideId;
+      const renameInput = active
+        ? `<input type="text" value="${escapeHtml(slide.title)}" data-rename-slide-id="${slide.id}" aria-label="Rename slide" />`
+        : `<strong>${escapeHtml(slide.title)}</strong>`;
+      return `<li><button class="deck-item ${active ? "active" : ""}" data-slide-id="${slide.id}"><span class="deck-item-order">${slide.order}</span><span class="deck-item-meta">${renameInput}<small>Slide ${slide.order} · ${escapeHtml(slide.type.replaceAll("_", " "))}</small></span></button></li>`;
+    })
     .join("");
 }
 
@@ -87,13 +128,14 @@ function renderSlideCanvas(slide) {
     })
     .join("");
 
-  return `<div class="canvas ${slide.layout_hints.grid_visible ? "with-grid" : ""} ${slide.layout_hints.safe_bounds_visible ? "with-safe-bounds" : ""}"><header class="slide-heading canvas-element" data-element-key="title:slide-title"><h3 contenteditable="true" data-edit-type="slide-title">${escapeHtml(slide.title)}</h3><p contenteditable="true" data-edit-type="slide-objective" data-element-key="objective:slide-objective">${escapeHtml(slide.objective || "")}</p></header><section class="content-group">${textBlocks}</section>${shapes}</div>`;
+  return `<div class="canvas ${slide.layout_hints.grid_visible ? "with-grid" : ""} ${slide.layout_hints.safe_bounds_visible ? "with-safe-bounds" : ""}" style="transform:scale(${zoomLevel});"><header class="slide-heading canvas-element" data-element-key="title:slide-title"><h3 contenteditable="true" data-edit-type="slide-title">${escapeHtml(slide.title)}</h3><p contenteditable="true" data-edit-type="slide-objective" data-element-key="objective:slide-objective">${escapeHtml(slide.objective || "")}</p></header><section class="content-group">${textBlocks}</section>${shapes}</div>`;
 }
 
 function renderPromptPanel() {
   if (!state.deck) return;
   promptInput.value = state.deck.user_prompt || "";
-  promptUpdatedAt.textContent = state.deck.prompt_last_updated_at ? `Last updated: ${state.deck.prompt_last_updated_at}` : "Last updated: never";
+  promptUpdatedAt.textContent = state.deck.prompt_last_updated_at ? `Last generated: ${state.deck.prompt_last_updated_at}` : "Last generated: never";
+  intentSummary.textContent = `Intent: ${state.deck.metadata?.description || "No interpreted summary yet."}`;
 }
 
 function renderJsonModel() {
@@ -103,11 +145,13 @@ function renderJsonModel() {
 function renderSlidePreview() {
   const slide = getSelectedSlide();
   if (!slide) {
-    slidePreview.innerHTML = "<p>Select a slide.</p>";
+    slidePreview.innerHTML = '<div class="panel-soft"><strong>Generate your first deck</strong><p class="muted">No slides are available yet. Try Generate or Regenerate.</p></div>';
+    slideTitleLabel.textContent = "No slide selected";
     return;
   }
   slideTitleLabel.textContent = `${slide.order}. ${slide.title}`;
   slidePreview.innerHTML = renderSlideCanvas(slide);
+  slidePreview.animate([{ opacity: 0.6, transform: "translateY(4px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: 160, easing: "ease-out" });
   applySelectionClass(slidePreview);
 }
 
@@ -117,6 +161,7 @@ function refreshUi() {
   renderPromptPanel();
   renderSlidePreview();
   renderJsonModel();
+  zoomLabel.textContent = `${Math.round(zoomLevel * 100)}%`;
   updateInspectorFromSelection(inspector);
 }
 
@@ -125,6 +170,7 @@ function persistEdit(element) {
   if (!slide) return;
   const textValue = element.textContent.trim();
   const editType = element.dataset.editType;
+  commitHistory();
 
   if (editType === "slide-title") slide.title = textValue;
   else if (editType === "slide-objective") slide.objective = textValue;
@@ -141,6 +187,7 @@ function persistEdit(element) {
 }
 
 async function loadDeck() {
+  setLoading(true);
   const response = await fetch("/api/semantic-deck");
   state.deck = ensureDeckDefaults(await parseJsonResponse(response));
   state.selectedSlideId = state.deck.slide_order[0];
@@ -167,6 +214,7 @@ async function saveDeck() {
 }
 
 async function loadProject(projectId) {
+  setLoading(true, "Loading project...");
   const response = await fetch(`/api/projects/${projectId}`);
   const payload = await parseJsonResponse(response);
   state.deck = ensureDeckDefaults(payload.deck);
@@ -176,6 +224,7 @@ async function loadProject(projectId) {
 }
 
 function addSlide() {
+  commitHistory();
   const newId = `slide-${Date.now()}`;
   state.deck.slides.push({
     id: newId,
@@ -195,6 +244,7 @@ function addSlide() {
 function duplicateSlide() {
   const slide = getSelectedSlide();
   if (!slide) return;
+  commitHistory();
   const clone = structuredClone(slide);
   clone.id = `${slide.id}-copy-${Date.now()}`;
   clone.title = `${slide.title} (copy)`;
@@ -207,6 +257,7 @@ function duplicateSlide() {
 
 function deleteSlide() {
   if (state.deck.slides.length <= 1) return;
+  commitHistory();
   const id = state.selectedSlideId;
   state.deck.slides = state.deck.slides.filter((slide) => slide.id !== id);
   state.deck.slide_order = state.deck.slide_order.filter((slideId) => slideId !== id);
@@ -222,9 +273,34 @@ function reindexSlides() {
   });
 }
 
+function onUndo() {
+  if (!history.past.length || !state.deck) return;
+  history.future.push(structuredClone(state.deck));
+  const snapshot = history.past.pop();
+  applyHistorySnapshot(snapshot);
+}
+
+function onRedo() {
+  if (!history.future.length || !state.deck) return;
+  history.past.push(structuredClone(state.deck));
+  const snapshot = history.future.pop();
+  applyHistorySnapshot(snapshot);
+}
+
 document.getElementById("add-slide").addEventListener("click", addSlide);
 document.getElementById("duplicate-slide").addEventListener("click", duplicateSlide);
 document.getElementById("delete-slide").addEventListener("click", deleteSlide);
+undoButton.addEventListener("click", onUndo);
+redoButton.addEventListener("click", onRedo);
+
+zoomInButton.addEventListener("click", () => {
+  zoomLevel = Math.min(1.6, zoomLevel + 0.1);
+  refreshUi();
+});
+zoomOutButton.addEventListener("click", () => {
+  zoomLevel = Math.max(0.6, zoomLevel - 0.1);
+  refreshUi();
+});
 
 deckList.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-slide-id]");
@@ -233,33 +309,69 @@ deckList.addEventListener("click", (event) => {
   updateSelection(null);
   refreshUi();
 });
+
+deckList.addEventListener("input", (event) => {
+  const input = event.target.closest("input[data-rename-slide-id]");
+  if (!input) return;
+  clearTimeout(promptUpdateDebounce);
+  promptUpdateDebounce = setTimeout(() => {
+    const slide = state.deck.slides.find((item) => item.id === input.dataset.renameSlideId);
+    if (!slide) return;
+    commitHistory();
+    slide.title = input.value.trim() || "Untitled slide";
+    refreshUi();
+  }, 160);
+});
+
 projectGalleryList.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-load-project-id]");
   if (!button) return;
-  loadProject(button.dataset.loadProjectId).catch((error) => setStatus(error.message, true));
+  loadProject(button.dataset.loadProjectId).catch((error) => setStatus(error.message, "error"));
 });
-slidePreview.addEventListener("blur", (event) => {
-  const target = event.target;
-  if (!(target instanceof HTMLElement) || !target.dataset.editType) return;
-  persistEdit(target);
-}, true);
 
-saveButton.addEventListener("click", () => saveDeck().then(() => setStatus("Project saved.")).catch((error) => setStatus(error.message, true)));
+slidePreview.addEventListener(
+  "blur",
+  (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement) || !target.dataset.editType) return;
+    persistEdit(target);
+  },
+  true
+);
+
+saveButton.addEventListener("click", () => saveDeck().then(() => setStatus("Project saved", "success")).catch((error) => setStatus(error.message, "error")));
 exportJsonButton.addEventListener("click", () => window.location.assign(`/api/projects/${state.selectedProjectId}/export/json`));
 exportPptxButton.addEventListener("click", () => window.location.assign(`/api/projects/${state.selectedProjectId}/export/pptx`));
+
 updatePromptButton.addEventListener("click", async () => {
   const response = await fetch("/api/semantic-deck/prompt", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_prompt: promptInput.value }) });
   state.deck = ensureDeckDefaults(await parseJsonResponse(response));
+  setStatus("Prompt updated", "success");
   refreshUi();
 });
-regenerateDeckButton.addEventListener("click", async () => {
+
+const regenerateDeck = async () => {
+  setLoading(true);
   const response = await fetch("/api/semantic-deck/regenerate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_prompt: promptInput.value }) });
   state.deck = ensureDeckDefaults(await parseJsonResponse(response));
+  state.selectedSlideId = state.deck.slide_order[0] || null;
+  setStatus("Deck regenerated", "success");
   refreshUi();
+};
+
+regenerateDeckButton.addEventListener("click", () => regenerateDeck().catch((error) => setStatus(`Generation failed: ${error.message}. Check if Ollama is running.`, "error")));
+generateDeckButton.addEventListener("click", () => regenerateDeck().catch((error) => setStatus(`Generation failed: ${error.message}. Check if Ollama is running.`, "error")));
+
+refinePromptButton.addEventListener("click", () => {
+  promptInput.value = `${promptInput.value.trim()}\nRefine the deck with clearer hierarchy, tighter messaging, and stronger visual consistency.`.trim();
+  setStatus("Prompt refined", "success");
 });
+
 regenerateSlideButton.addEventListener("click", async () => {
+  setLoading(true, "Regenerating slide...");
   const response = await fetch("/api/semantic-deck/regenerate-slide", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slide_id: state.selectedSlideId, user_prompt: promptInput.value }) });
   state.deck = ensureDeckDefaults(await parseJsonResponse(response));
+  setStatus("Slide regenerated", "success");
   refreshUi();
 });
 
@@ -278,5 +390,16 @@ attachCanvasManipulationHandlers(
 attachInspectorHandlers(inspector, refreshUi);
 attachToolbarHandlers(toolbar, refreshUi);
 
-loadDeck().catch((error) => setStatus(`Failed to load deck: ${error.message}`, true));
-loadProjects().catch((error) => setStatus(`Failed to load projects: ${error.message}`, true));
+document.addEventListener("keydown", (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+    event.preventDefault();
+    onUndo();
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
+    event.preventDefault();
+    onRedo();
+  }
+});
+
+loadDeck().catch((error) => setStatus(`Failed to load deck: ${error.message}`, "error"));
+loadProjects().catch((error) => setStatus(`Failed to load projects: ${error.message}`, "error"));

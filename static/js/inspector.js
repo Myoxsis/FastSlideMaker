@@ -10,50 +10,69 @@ function byKey(slide, key) {
   return null;
 }
 
+function selectionMeta(selected) {
+  if (!selected?.ref) return "No selection";
+  const label = selected.ref.id || selected.kind;
+  return `${selected.kind} · ${label}`;
+}
+
+function section(title, content, open = false) {
+  return `<details class="inspector-group" ${open ? "open" : ""}><summary>${title}</summary><div class="inspector-controls">${content}</div></details>`;
+}
+
 export function updateInspectorFromSelection(inspectorEl) {
   const slide = getSelectedSlide();
   const selected = byKey(slide, state.selectedElementKey);
 
   if (!selected?.ref) {
-    inspectorEl.innerHTML = '<p class="muted">Select an element to edit its properties.</p>';
+    inspectorEl.innerHTML = '<div class="inspector-empty"><p class="muted">Select an element to edit.</p></div>';
     return;
   }
 
   const style = selected.ref.style || {};
   inspectorEl.innerHTML = `
-    <h3>Inspector</h3>
-    <p class="muted">${selected.kind} · ${selected.ref.id || selected.kind}</p>
-    <label>Font size <input data-inspector-field="font_size" type="number" min="8" max="72" value="${style.font_size || 16}" /></label>
-    <label>Font weight
-      <select data-inspector-field="font_weight">
-        <option value="regular" ${style.font_weight === "regular" ? "selected" : ""}>regular</option>
-        <option value="bold" ${style.font_weight === "bold" ? "selected" : ""}>bold</option>
-      </select>
-    </label>
-    <label>Italic <input data-inspector-field="italic" type="checkbox" ${style.italic ? "checked" : ""} /></label>
-    <label>Text color <input data-inspector-field="text_color" type="color" value="${style.text_color || "#111827"}" /></label>
-    <label>Fill color <input data-inspector-field="fill_color" type="color" value="${style.fill_color || "#ffffff"}" /></label>
-    <label>Border color <input data-inspector-field="border_color" type="color" value="${style.border_color || "#94a3b8"}" /></label>
-    <label>Border width <input data-inspector-field="border_width" type="number" min="0" max="16" step="0.5" value="${style.border_width ?? 1}" /></label>
-    <label>Opacity <input data-inspector-field="opacity" type="number" min="0.1" max="1" step="0.1" value="${style.opacity ?? 1}" /></label>
-    <label>Padding <input data-inspector-field="padding" type="number" min="0" max="40" value="${style.padding ?? 8}" /></label>
-    <label>Align
-      <select data-inspector-field="text_align">
-        <option value="left" ${style.text_align === "left" ? "selected" : ""}>left</option>
-        <option value="center" ${style.text_align === "center" ? "selected" : ""}>center</option>
-        <option value="right" ${style.text_align === "right" ? "selected" : ""}>right</option>
-      </select>
-    </label>
-    <label>Line spacing <input data-inspector-field="line_spacing" type="number" min="1" max="2" step="0.1" value="${style.line_spacing ?? 1.2}" /></label>
-    <label>Bullet style
-      <select data-inspector-field="bullet_style">
-        <option value="disc" ${style.bullet_style === "disc" ? "selected" : ""}>disc</option>
-        <option value="dash" ${style.bullet_style === "dash" ? "selected" : ""}>dash</option>
-        <option value="number" ${style.bullet_style === "number" ? "selected" : ""}>number</option>
-      </select>
-    </label>
-    <label>Uppercase <input data-inspector-field="text_case" type="checkbox" ${style.text_case === "uppercase" ? "checked" : ""} /></label>
-    <label>User locked <input data-inspector-field="user_locked" type="checkbox" ${selected.ref.user_locked ? "checked" : ""} /></label>
+    <p class="muted">${selectionMeta(selected)}</p>
+    ${section(
+      "Text",
+      `<label>Font size <input data-inspector-field="font_size" type="number" min="8" max="72" value="${style.font_size || 16}" /></label>
+      <label>Font weight
+        <select data-inspector-field="font_weight">
+          <option value="regular" ${style.font_weight === "regular" ? "selected" : ""}>regular</option>
+          <option value="bold" ${style.font_weight === "bold" ? "selected" : ""}>bold</option>
+        </select>
+      </label>
+      <label>Italic <input data-inspector-field="italic" type="checkbox" ${style.italic ? "checked" : ""} /></label>
+      <label>Text color <input data-inspector-field="text_color" type="color" value="${style.text_color || "#111827"}" /></label>
+      <label>Align
+        <select data-inspector-field="text_align">
+          <option value="left" ${style.text_align === "left" ? "selected" : ""}>left</option>
+          <option value="center" ${style.text_align === "center" ? "selected" : ""}>center</option>
+          <option value="right" ${style.text_align === "right" ? "selected" : ""}>right</option>
+        </select>
+      </label>
+      <label>Line spacing <input data-inspector-field="line_spacing" type="number" min="1" max="2" step="0.1" value="${style.line_spacing ?? 1.2}" /></label>
+      <label>Uppercase <input data-inspector-field="text_case" type="checkbox" ${style.text_case === "uppercase" ? "checked" : ""} /></label>`,
+      true
+    )}
+    ${section(
+      "Shape",
+      `<label>Fill color <input data-inspector-field="fill_color" type="color" value="${style.fill_color || "#ffffff"}" /></label>
+      <label>Border color <input data-inspector-field="border_color" type="color" value="${style.border_color || "#94a3b8"}" /></label>
+      <label>Border width <input data-inspector-field="border_width" type="number" min="0" max="16" step="0.5" value="${style.border_width ?? 1}" /></label>
+      <label>Opacity <input data-inspector-field="opacity" type="number" min="0.1" max="1" step="0.1" value="${style.opacity ?? 1}" /></label>`
+    )}
+    ${section(
+      "Layout",
+      `<label>Padding <input data-inspector-field="padding" type="number" min="0" max="40" value="${style.padding ?? 8}" /></label>
+      <label>Bullet style
+        <select data-inspector-field="bullet_style">
+          <option value="disc" ${style.bullet_style === "disc" ? "selected" : ""}>disc</option>
+          <option value="dash" ${style.bullet_style === "dash" ? "selected" : ""}>dash</option>
+          <option value="number" ${style.bullet_style === "number" ? "selected" : ""}>number</option>
+        </select>
+      </label>`
+    )}
+    ${section("Spacing", `<label>User locked <input data-inspector-field="user_locked" type="checkbox" ${selected.ref.user_locked ? "checked" : ""} /></label>`)}
   `;
 }
 

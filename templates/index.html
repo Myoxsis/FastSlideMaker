@@ -8,20 +8,29 @@
   </head>
   <body>
     <main class="app-shell">
-      <header class="app-header">
-        <div>
-          <h1>Fast Slide Maker Editor</h1>
-          <p>JSON-driven, deterministic presentation editor with native PPTX output.</p>
+      <header class="top-toolbar" aria-label="Top toolbar">
+        <div class="brand-block">
+          <h1>Fast Slide Maker</h1>
+          <p>Structured, deterministic slide editor</p>
         </div>
-        <div class="header-controls">
-          <input id="project-name" type="text" placeholder="Project name" />
-          <button id="save-deck" type="button">Save Project</button>
-          <button id="export-json" type="button">Export JSON</button>
-          <button id="export-pptx" type="button">Export PPTX</button>
+
+        <div class="toolbar-actions">
+          <button id="generate-deck" class="btn btn-primary" type="button">Generate</button>
+          <button id="regenerate-deck" class="btn" type="button">Regenerate</button>
+          <button id="refine-prompt" class="btn" type="button">Refine</button>
+        </div>
+
+        <div class="toolbar-actions">
+          <button id="save-deck" class="btn" type="button">Save</button>
+          <button id="export-json" class="btn" type="button">Export JSON</button>
+          <button id="export-pptx" class="btn" type="button">Export PPTX</button>
+          <button id="undo-action" class="btn" type="button">Undo</button>
+          <button id="redo-action" class="btn" type="button">Redo</button>
+          <span class="model-indicator" id="model-indicator">Model: ollama</span>
         </div>
       </header>
 
-      <section id="editor-toolbar" class="editor-toolbar">
+      <section id="editor-toolbar" class="editor-toolbar" aria-label="Element toolbar">
         <button data-action="nudge-left" type="button">◀</button>
         <button data-action="nudge-right" type="button">▶</button>
         <button data-action="nudge-up" type="button">▲</button>
@@ -38,51 +47,71 @@
         <button data-action="insert-shape:arrow" type="button">Arrow</button>
         <button data-action="insert-shape:connector" type="button">Connector</button>
         <button data-action="insert-shape:callout" type="button">Callout</button>
-        <button data-action="insert-shape:divider" type="button">Divider</button>
-        <button data-action="insert-shape:legend" type="button">Legend</button>
-        <button data-action="insert-shape:section_header" type="button">Section Header</button>
-        <button data-action="insert-shape:icon" type="button">Icon</button>
       </section>
 
       <section class="workspace presentation-layout">
-        <aside class="deck-panel" aria-label="Slide list">
-          <section class="prompt-panel">
-            <h3>Prompt</h3>
-            <textarea id="prompt-input" rows="6" placeholder="Enter prompt"></textarea>
-            <small id="prompt-updated-at" class="muted"></small>
+        <aside class="left-sidebar panel" aria-label="Slide list and prompts">
+          <section class="prompt-panel panel-soft">
+            <div class="panel-heading">
+              <h2>Prompt</h2>
+              <small id="prompt-updated-at" class="muted"></small>
+            </div>
+            <textarea id="prompt-input" rows="6" placeholder="Describe your deck goals, audience, and style..."></textarea>
+            <p id="intent-summary" class="muted">Intent summary will appear after generation.</p>
             <div class="prompt-actions">
-              <button id="update-prompt" type="button">Update prompt</button>
-              <button id="regenerate-deck" type="button">Regenerate deck</button>
-              <button id="regenerate-slide" type="button">Regenerate selected slide</button>
+              <button id="update-prompt" class="btn" type="button">Update prompt</button>
+              <button id="regenerate-slide" class="btn" type="button">Regenerate slide</button>
             </div>
           </section>
-          <h2>Slides</h2>
-          <div class="slide-actions">
-            <button id="add-slide" type="button">Add</button>
-            <button id="duplicate-slide" type="button">Duplicate</button>
-            <button id="delete-slide" type="button">Delete</button>
-          </div>
-          <ul id="deck-list"></ul>
-          <div class="project-gallery">
-            <h3>Project Gallery</h3>
+
+          <section class="slides-panel">
+            <div class="panel-heading">
+              <h2>Slides</h2>
+              <span class="muted" id="slide-count-label">0 slides</span>
+            </div>
+            <div class="slide-actions">
+              <button id="add-slide" class="btn" type="button">Add</button>
+              <button id="duplicate-slide" class="btn" type="button">Duplicate</button>
+              <button id="delete-slide" class="btn" type="button">Delete</button>
+            </div>
+            <ul id="deck-list" class="deck-list"></ul>
+          </section>
+
+          <section class="project-gallery panel-soft">
+            <div class="panel-heading">
+              <h3>Projects</h3>
+              <input id="project-name" type="text" placeholder="Project name" />
+            </div>
             <ul id="project-gallery-list"></ul>
-          </div>
+          </section>
         </aside>
 
-        <section class="slide-panel">
-          <div class="slide-toolbar">
+        <section class="center-canvas panel" aria-label="Slide canvas">
+          <div class="canvas-head">
             <div>
-              <span class="muted">Selected slide</span>
-              <h2 id="slide-title-label"></h2>
+              <small class="muted">Current slide</small>
+              <h2 id="slide-title-label">No slide selected</h2>
+            </div>
+            <div class="zoom-controls">
+              <button id="zoom-out" class="btn" type="button">−</button>
+              <span id="zoom-label">100%</span>
+              <button id="zoom-in" class="btn" type="button">+</button>
             </div>
           </div>
           <article id="slide-preview" class="slide-preview" aria-live="polite"></article>
+          <div id="status-message" class="status-message" role="status" aria-live="polite"></div>
         </section>
 
-        <aside class="inspector-panel" id="inspector-panel"></aside>
+        <aside class="right-inspector panel" aria-label="Inspector">
+          <div class="panel-heading">
+            <h2>Inspector</h2>
+            <small class="muted">Context-aware properties</small>
+          </div>
+          <section id="inspector-panel"></section>
+        </aside>
       </section>
 
-      <section class="json-panel">
+      <section class="json-panel panel">
         <h2>Semantic JSON (source of truth)</h2>
         <pre id="json-output"></pre>
       </section>
