@@ -235,6 +235,44 @@ button {
   gap: 10px;
 }
 
+.swimlane-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.swimlane-row {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  display: grid;
+  grid-template-columns: minmax(130px, 180px) 1fr;
+  overflow: hidden;
+}
+
+.swimlane-row h4 {
+  margin: 0;
+  padding: 12px;
+  border-right: 1px solid var(--line);
+  background: #eef4ff;
+  display: grid;
+  align-items: center;
+}
+
+.swimlane-items {
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.swimlane-item {
+  border: 1px dashed #cfdbf4;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fbfdff;
+  display: grid;
+  gap: 4px;
+}
+
 .token-row {
   display: flex;
   flex-wrap: wrap;

@@ -12,7 +12,7 @@ def _semantic_fixture() -> SemanticPresentation:
     return SemanticPresentation.model_validate(
         {
             "metadata": {"title": "Delivery Plan", "audience": "Leadership", "purpose": "Execution alignment"},
-            "slide_order": ["process-flow", "layered-architecture", "roadmap"],
+            "slide_order": ["process-flow", "team-handoffs", "layered-architecture", "roadmap"],
             "slides": [
                 {
                     "id": "process-flow",
@@ -29,8 +29,35 @@ def _semantic_fixture() -> SemanticPresentation:
                     },
                 },
                 {
-                    "id": "layered-architecture",
+                    "id": "team-handoffs",
                     "order": 2,
+                    "type": "swimlane",
+                    "title": "Cross-Team Handoffs",
+                    "objective": "Clarify responsibilities across delivery lanes.",
+                    "swimlanes": {
+                        "lanes": [
+                            {
+                                "id": "lane-1",
+                                "lane_label": "Product",
+                                "items": [
+                                    {"id": "item-1", "label": "Define scope", "detail": "Backlog and acceptance criteria"},
+                                    {"id": "item-2", "label": "Approve priorities"},
+                                ],
+                            },
+                            {
+                                "id": "lane-2",
+                                "lane_label": "Engineering",
+                                "items": [
+                                    {"id": "item-3", "label": "Implement sprint plan"},
+                                    {"id": "item-4", "label": "Ship release candidate", "detail": "Validate quality gates"},
+                                ],
+                            },
+                        ]
+                    },
+                },
+                {
+                    "id": "layered-architecture",
+                    "order": 3,
                     "type": "architecture",
                     "title": "Layered Architecture",
                     "objective": "Separate concerns cleanly.",
@@ -53,7 +80,7 @@ def _semantic_fixture() -> SemanticPresentation:
                 },
                 {
                     "id": "roadmap",
-                    "order": 3,
+                    "order": 4,
                     "type": "roadmap",
                     "title": "Roadmap",
                     "objective": "Track phased delivery milestones.",

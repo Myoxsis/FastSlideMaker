@@ -23,6 +23,7 @@ from app.models.schemas import (
     SemanticPresentation,
     SemanticSlide,
     SlideType,
+    Swimlane,
     TextBlock,
 )
 
@@ -161,6 +162,10 @@ class PptxExporter:
             self._render_process_flow(pptx_slide, slide.process.steps)
             return
 
+        if slide.swimlanes:
+            self._render_swimlanes(pptx_slide, slide.swimlanes.lanes)
+            return
+
         if slide.architecture:
             self._render_layered_architecture(pptx_slide, slide.architecture.layers)
             return
@@ -279,6 +284,71 @@ class PptxExporter:
                 components.text = f"Components: {', '.join(layer.components[:6])}"
                 components.font.size = Pt(self.theme.small_size_pt)
                 components.font.color.rgb = self.theme.muted
+
+    def _render_swimlanes(self, pptx_slide: Any, lanes: list[Swimlane]) -> None:
+        lane_count = min(max(len(lanes), 1), 6)
+        left = Inches(0.75)
+        top = Inches(1.95)
+        width = Inches(12.0)
+        gap = Inches(0.12)
+        total_height = Inches(4.95)
+        lane_height = (total_height - gap * (lane_count - 1)) / lane_count
+        label_width = Inches(2.1)
+
+        for idx, lane in enumerate(lanes[:lane_count]):
+            lane_top = top + idx * (lane_height + gap)
+
+            label_card = pptx_slide.shapes.add_shape(
+                MSO_AUTO_SHAPE_TYPE.ROUNDED_RECTANGLE,
+                left,
+                lane_top,
+                label_width,
+                lane_height,
+            )
+            label_card.fill.solid()
+            label_card.fill.fore_color.rgb = RGBColor(233, 242, 255) if idx % 2 == 0 else RGBColor(240, 247, 255)
+            label_card.line.color.rgb = Theme.accent
+
+            label_tf = label_card.text_frame
+            label_tf.clear()
+            label_tf.word_wrap = True
+            label_p = label_tf.paragraphs[0]
+            label_p.alignment = PP_ALIGN.CENTER
+            label_p.text = _wrap_text(lane.lane_label, max_chars=20)
+            label_p.font.bold = True
+            label_p.font.size = Pt(self.theme.body_size_pt)
+            label_p.font.color.rgb = self.theme.title
+
+            body_card = pptx_slide.shapes.add_shape(
+                MSO_AUTO_SHAPE_TYPE.RECTANGLE,
+                left + label_width,
+                lane_top,
+                width - label_width,
+                lane_height,
+            )
+            body_card.fill.solid()
+            body_card.fill.fore_color.rgb = Theme.white if idx % 2 == 0 else RGBColor(250, 252, 255)
+            body_card.line.color.rgb = Theme.border
+
+            body_tf = body_card.text_frame
+            body_tf.clear()
+            body_tf.word_wrap = True
+
+            if not lane.items:
+                paragraph = body_tf.paragraphs[0]
+                paragraph.text = "No activities defined."
+                paragraph.font.size = Pt(self.theme.small_size_pt)
+                paragraph.font.color.rgb = self.theme.muted
+                continue
+
+            max_items = min(len(lane.items), 5)
+            for item_idx, item in enumerate(lane.items[:max_items]):
+                paragraph = body_tf.paragraphs[0] if item_idx == 0 else body_tf.add_paragraph()
+                detail = f": {item.detail}" if item.detail else ""
+                paragraph.text = f"• {_wrap_text(item.label + detail, max_chars=86)}"
+                paragraph.level = 0
+                paragraph.font.size = Pt(self.theme.small_size_pt)
+                paragraph.font.color.rgb = self.theme.body
 
     def _render_roadmap(self, pptx_slide: Any, phases: list[RoadmapPhase]) -> None:
         axis_left = Inches(1.1)
