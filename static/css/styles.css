@@ -1,0 +1,46 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #f5f7fb;
+  color: #1f2a37;
+}
+
+main {
+  max-width: 800px;
+  margin: 2rem auto;
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+label,
+input,
+select,
+button,
+textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+button {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border: 0;
+  border-radius: 8px;
+  background: #1f6feb;
+  color: #fff;
+}
+
+pre {
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 1rem;
+  border-radius: 8px;
+  overflow: auto;
+}

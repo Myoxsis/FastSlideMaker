@@ -1,88 +1,75 @@
-# FastSlideMaker
+# Fast Slide Maker
 
-FastSlideMaker is a local-first app that generates business-quality slides from prompts for process and IT solution design use cases.
+Fast Slide Maker is a slide-generation agent scaffold with a FastAPI backend and a lightweight HTML/CSS/JS frontend.
 
-## Core design
+## What is included
 
-- Uses an LLM (Ollama) to generate **semantic JSON**.
-- Semantic JSON is the **source of truth**.
-- Frontend renders deterministic HTML previews from JSON.
-- Exporter maps JSON to **native editable PPTX objects** (text boxes, shapes, connectors).
-- No screenshot-based export and no arbitrary HTML-to-PPT conversion.
+- Modular Python package layout under `app/`
+- Pipeline stages with clear boundaries:
+  - `generation` (LLM or mock)
+  - `validation`
+  - `rendering`
+  - `export`
+- Ollama configuration module with environment overrides
+- Mock mode fallback when Ollama is unavailable
+- Static frontend and Jinja template
+- Sample JSON request/response files
+- Placeholder unit/integration test structure
 
-## Stack
+## Quickstart
 
-- Backend: FastAPI + Python
-- Frontend: HTML/CSS/vanilla JS
-- LLM: local Ollama HTTP endpoint (`http://localhost:11434`)
-- Export: `python-pptx`
-
-## Required modules implemented
-
-- `request_interpreter.py`
-- `deck_planner.py`
-- `slide_generator.py`
-- `llm_client.py`
-- `schema.py`
-- `validator.py`
-- `layout_engine.py`
-- `pptx_exporter.py`
-- `project_store.py`
-- `app.py`
-- `templates/`
-- `static/`
-- `samples/`
-
-## Supported slide types
-
-- `executive_summary`
-- `process_flow`
-- `swimlane`
-- `current_vs_target`
-- `layered_architecture`
-- `integration_map`
-- `roadmap`
-- `issue_implication_recommendation`
-
-## Run locally
+### 1) Install dependencies
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app:app --reload
 ```
 
-Open `http://127.0.0.1:8000`.
+### 2) Configure environment
 
-## Typical flow
+Optional `.env` file:
 
-1. Enter prompt (e.g., "Create a 5-slide deck explaining the lead-to-cash process and the target solution architecture").
-2. Backend interprets request and builds a deck plan.
-3. LLM generates semantic JSON (or mock fallback if Ollama is unavailable).
-4. Validator normalizes JSON to schema.
-5. UI renders HTML previews.
-6. Export endpoint generates editable PPTX.
+```env
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_MODEL=llama3.1
+OLLAMA_TEMPERATURE=0.4
+OLLAMA_TOP_P=0.9
+OLLAMA_MAX_TOKENS=1200
+ENABLE_MOCK_MODE=true
+REQUEST_TIMEOUT_SECONDS=20
+```
 
-## API endpoints
+### 3) Run the app
 
-- `POST /api/generate` - generate and save deck
-- `GET /api/projects` - list projects
-- `GET /api/projects/{project_id}` - fetch project JSON
-- `GET /api/projects/{project_id}/preview` - deterministic preview view model
-- `GET /api/projects/{project_id}/export` - download PPTX
+```bash
+uvicorn app.main:app --reload
+```
 
-## Samples
+Open: http://127.0.0.1:8000
 
-- Prompt examples: `samples/sample_prompts.txt`
-- Example semantic JSON: `samples/sample_generated_deck.json`
-- Saved projects and exports are written under `samples/projects/` and `samples/exports/`
+### 4) Run tests
 
-## Notes
+```bash
+pytest
+```
 
-- The LLM does not control coordinates.
-- Layout and export are deterministic and template-driven.
-- Template-rich rendering is implemented for:
-  - `process_flow`
-  - `layered_architecture`
-  - `roadmap`
+## Project layout
+
+```text
+app/
+  api/routes.py
+  core/config.py
+  core/startup.py
+  models/schemas.py
+  services/generation.py
+  services/validation.py
+  services/rendering.py
+  services/export.py
+templates/index.html
+static/css/styles.css
+static/js/app.js
+samples/*.json
+tests/unit/*.py
+tests/integration/*.py
+```
