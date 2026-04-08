@@ -55,14 +55,14 @@ class SlideGenerator:
     ) -> SemanticSlide:
         """Generate and validate a single semantic slide."""
         slide_type = self._coerce_type(selected_slide_type)
-        raw = await self._llm.generate_slide_json(
-            plan_json=self._build_prompt_payload(deck_context, current_slide_objective, slide_type, slide_id, order, title),
-            slide_count=1,
+        parsed = await self._request_slide_json(
+            deck_context=deck_context,
+            objective=current_slide_objective,
+            slide_type=slide_type,
+            slide_id=slide_id,
+            order=order,
+            title=title,
         )
-
-        parsed = self._parse_json(raw)
-        if parsed is None:
-            parsed = await self._repair_and_parse(raw, slide_type)
 
         semantic_json = self._extract_slide_payload(
             parsed,
@@ -92,6 +92,46 @@ class SlideGenerator:
             order=slide_plan_item.order,
             title=slide_plan_item.title,
         )
+
+    async def _request_slide_json(
+        self,
+        *,
+        deck_context: str,
+        objective: str,
+        slide_type: SlideType,
+        slide_id: str,
+        order: int,
+        title: str | None,
+    ) -> dict[str, Any]:
+        if hasattr(self._llm, "generate_slide"):
+            generated = await self._llm.generate_slide(
+                deck_context={
+                    "deck_title": "Generated Deck",
+                    "audience": "Stakeholders",
+                    "deck_objective": objective,
+                    "context": deck_context,
+                },
+                slide_plan_item={
+                    "id": slide_id,
+                    "order": order,
+                    "slide_type": slide_type.value,
+                    "objective": objective,
+                    "key_message": title or objective,
+                },
+                previous_slides=[],
+            )
+            if isinstance(generated, dict):
+                return generated
+
+        raw = await self._llm.generate_slide_json(
+            plan_json=self._build_prompt_payload(deck_context, objective, slide_type, slide_id, order, title),
+            slide_count=1,
+        )
+
+        parsed = self._parse_json(raw)
+        if parsed is not None:
+            return parsed
+        return await self._repair_and_parse(raw, slide_type)
 
     def _build_prompt_payload(
         self,
@@ -130,6 +170,9 @@ class SlideGenerator:
                 '{"id":"s1","order":1,"type":"%s","title":"...","objective":"..."}' % slide_type.value
             ),
         )
+        if isinstance(repaired, dict):
+            return repaired
+
         repaired_parsed = self._parse_json(repaired)
         if repaired_parsed is None:
             raise ValueError("LLM output could not be parsed, even after repair.")

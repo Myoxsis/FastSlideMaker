@@ -1,0 +1,29 @@
+Create a deck plan for a business presentation.
+
+Input:
+- user_request: the request text from the user
+- constraints: optional JSON with keys like slide_count, audience, tone
+
+Output format (JSON only):
+{
+  "deck_title": "...",
+  "audience": "...",
+  "deck_objective": "...",
+  "slides": [
+    {
+      "id": "s1",
+      "slide_type": "...",
+      "objective": "...",
+      "key_message": "..."
+    }
+  ]
+}
+
+Planning rules:
+- Choose only allowed slide types: executive_summary, process_flow, layered_architecture, roadmap.
+- If constraints.slide_count is absent, default to 3-7 slides.
+- Respect constraints.audience and constraints.tone when present.
+- Ensure logical flow across slides: executive_summary -> process_flow -> layered_architecture -> roadmap.
+- Keep objectives and key_message concise and presentation-ready.
+- Do not include extra keys.
+- Output valid JSON only.

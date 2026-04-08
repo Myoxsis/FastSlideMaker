@@ -1,0 +1,131 @@
+{
+  "examples": [
+    {
+      "input": "3 slides on order-to-cash process",
+      "deck_plan_output": {
+        "deck_title": "Order-to-Cash Process Improvement",
+        "audience": "Operations leadership",
+        "deck_objective": "Reduce cycle time and leakage in order-to-cash.",
+        "slides": [
+          {
+            "id": "s1",
+            "slide_type": "executive_summary",
+            "objective": "Frame current performance gap",
+            "key_message": "Manual handoffs are the primary delay driver."
+          },
+          {
+            "id": "s2",
+            "slide_type": "process_flow",
+            "objective": "Show current-to-target process",
+            "key_message": "Automated checks remove approval bottlenecks."
+          },
+          {
+            "id": "s3",
+            "slide_type": "roadmap",
+            "objective": "Sequence implementation",
+            "key_message": "Phased rollout achieves value within two quarters."
+          }
+        ]
+      }
+    },
+    {
+      "input": "target architecture for claims system",
+      "slide_output": {
+        "id": "s2",
+        "order": 2,
+        "type": "architecture",
+        "title": "Target Claims Architecture",
+        "objective": "Define end-state service layers",
+        "architecture": {
+          "layers": [
+            {
+              "id": "a1",
+              "name": "Channel Layer",
+              "responsibility": "Capture and route intake",
+              "components": ["Agent Portal", "Customer Portal", "API Gateway"]
+            },
+            {
+              "id": "a2",
+              "name": "Business Services",
+              "responsibility": "Adjudicate and orchestrate claims",
+              "components": ["Workflow Engine", "Rules Service", "Document Service"]
+            },
+            {
+              "id": "a3",
+              "name": "Data and Integration",
+              "responsibility": "Persist and exchange data",
+              "components": ["Operational Store", "Event Bus", "Reporting Mart"]
+            }
+          ],
+          "integrations": [
+            {
+              "id": "int1",
+              "system": "Policy Administration",
+              "purpose": "Validate policy coverage",
+              "direction": "bidirectional"
+            },
+            {
+              "id": "int2",
+              "system": "Payments Platform",
+              "purpose": "Issue approved payments",
+              "direction": "outbound"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": "roadmap for digital transformation",
+      "slide_output": {
+        "id": "s3",
+        "order": 3,
+        "type": "roadmap",
+        "title": "Digital Transformation Roadmap",
+        "objective": "Sequence capability uplift",
+        "roadmap": {
+          "phases": [
+            {
+              "id": "r1",
+              "name": "Mobilize",
+              "objective": "Stand up governance and funding",
+              "milestones": [
+                {
+                  "id": "m1",
+                  "label": "Program charter approved",
+                  "status": "planned",
+                  "target_period": "Q1"
+                }
+              ]
+            },
+            {
+              "id": "r2",
+              "name": "Modernize Core",
+              "objective": "Upgrade core platform services",
+              "milestones": [
+                {
+                  "id": "m2",
+                  "label": "Core release live",
+                  "status": "planned",
+                  "target_period": "Q2"
+                }
+              ]
+            },
+            {
+              "id": "r3",
+              "name": "Scale Automation",
+              "objective": "Expand AI and workflow automation",
+              "milestones": [
+                {
+                  "id": "m3",
+                  "label": "Enterprise rollout",
+                  "status": "planned",
+                  "target_period": "Q3"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
