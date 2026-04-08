@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
-from app.models.schemas import DeckRequest, DeckResponse, MilestoneStatus, SemanticPresentation, SlideType, TextRole
+from app.models.schemas import DeckRequest, DeckResponse, MilestoneStatus, SemanticPresentation, SlideType, TextBlock, TextRole
 from app.services.designer import DesignerService
 from app.services.export import ExportService
 from app.services.generation import GenerationService
@@ -25,6 +26,19 @@ class SaveProjectRequest(BaseModel):
     deck: SemanticPresentation
 
 
+class PromptUpdateRequest(BaseModel):
+    user_prompt: str = Field(default="", max_length=8000)
+
+
+class RegenerateDeckRequest(BaseModel):
+    user_prompt: str | None = Field(default=None, max_length=8000)
+
+
+class RegenerateSlideRequest(BaseModel):
+    slide_id: str = Field(..., min_length=1, max_length=64)
+    user_prompt: str | None = Field(default=None, max_length=8000)
+
+
 def _project_store(request: Request) -> ProjectStore:
     if not hasattr(request.app.state, "project_store"):
         request.app.state.project_store = ProjectStore()
@@ -32,6 +46,8 @@ def _project_store(request: Request) -> ProjectStore:
 
 
 def _build_default_semantic_deck() -> SemanticPresentation:
+    now = datetime.now(timezone.utc).isoformat()
+    default_prompt = "Build an executive-ready enterprise delivery plan with process, architecture, and roadmap slides."
     return SemanticPresentation.model_validate(
         {
             "metadata": {
@@ -40,6 +56,8 @@ def _build_default_semantic_deck() -> SemanticPresentation:
                 "audience": "Executive Leadership",
                 "purpose": "Align teams on delivery design and milestones",
             },
+            "user_prompt": default_prompt,
+            "prompt_last_updated_at": now,
             "slide_order": ["process-flow", "layered-architecture", "roadmap"],
             "slides": [
                 {
@@ -203,6 +221,68 @@ def _build_default_semantic_deck() -> SemanticPresentation:
         }
     )
 
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _build_regenerated_text(prompt: str, slide_title: str, index: int) -> str:
+    return (
+        f"{prompt} — {slide_title} focus: "
+        f"deterministic update #{index} aligned to the active project context."
+    )
+
+
+def _regenerate_semantic_deck(deck: SemanticPresentation, prompt: str) -> SemanticPresentation:
+    normalized_prompt = prompt.strip()
+    updated = deck.model_copy(deep=True)
+    updated.user_prompt = normalized_prompt
+    updated.prompt_last_updated_at = _now_iso()
+    if normalized_prompt:
+        updated.metadata.purpose = normalized_prompt[:280]
+
+    for index, slide in enumerate(updated.slides, start=1):
+        slide.objective = f"Generated from current prompt for {slide.title}."
+        if slide.text_blocks:
+            slide.text_blocks[0].text = _build_regenerated_text(normalized_prompt, slide.title, index)[:2000]
+        else:
+            slide.text_blocks = [
+                TextBlock(
+                    id=f"prompt-context-{index}",
+                    role=TextRole.CALLOUT,
+                    label="Prompt Context",
+                    text=_build_regenerated_text(normalized_prompt, slide.title, index)[:2000],
+                )
+            ]
+    return DesignerService().design_presentation(updated.normalized())
+
+
+def _regenerate_single_slide(deck: SemanticPresentation, prompt: str, slide_id: str) -> SemanticPresentation:
+    normalized_prompt = prompt.strip()
+    updated = deck.model_copy(deep=True)
+    updated.user_prompt = normalized_prompt
+    updated.prompt_last_updated_at = _now_iso()
+
+    for slide in updated.slides:
+        if slide.id != slide_id:
+            continue
+        slide.objective = f"Generated from current prompt for {slide.title}."
+        if slide.text_blocks:
+            slide.text_blocks[0].text = _build_regenerated_text(normalized_prompt, slide.title, slide.order)[:2000]
+        else:
+            slide.text_blocks = [
+                TextBlock(
+                    id=f"prompt-context-{slide.order}",
+                    role=TextRole.CALLOUT,
+                    label="Prompt Context",
+                    text=_build_regenerated_text(normalized_prompt, slide.title, slide.order)[:2000],
+                )
+            ]
+        break
+    else:
+        raise HTTPException(status_code=404, detail=f"Slide '{slide_id}' not found in current deck.")
+
+    return DesignerService().design_presentation(updated.normalized())
+
 
 @router.get("/health")
 async def health_check(request: Request) -> dict:
@@ -231,6 +311,42 @@ async def update_semantic_deck(payload: SemanticPresentation, request: Request) 
     designed = DesignerService().design_presentation(payload.normalized())
     request.app.state.semantic_preview_deck = designed
     return designed
+
+
+@router.put("/api/semantic-deck/prompt", response_model=SemanticPresentation)
+async def update_semantic_deck_prompt(payload: PromptUpdateRequest, request: Request) -> SemanticPresentation:
+    if not hasattr(request.app.state, "semantic_preview_deck"):
+        request.app.state.semantic_preview_deck = DesignerService().design_presentation(_build_default_semantic_deck())
+    deck: SemanticPresentation = request.app.state.semantic_preview_deck
+    updated = deck.model_copy(
+        deep=True,
+        update={"user_prompt": payload.user_prompt.strip(), "prompt_last_updated_at": _now_iso()},
+    )
+    designed = DesignerService().design_presentation(updated.normalized())
+    request.app.state.semantic_preview_deck = designed
+    return designed
+
+
+@router.post("/api/semantic-deck/regenerate", response_model=SemanticPresentation)
+async def regenerate_semantic_deck(payload: RegenerateDeckRequest, request: Request) -> SemanticPresentation:
+    if not hasattr(request.app.state, "semantic_preview_deck"):
+        request.app.state.semantic_preview_deck = DesignerService().design_presentation(_build_default_semantic_deck())
+    deck: SemanticPresentation = request.app.state.semantic_preview_deck
+    prompt = payload.user_prompt if payload.user_prompt is not None else deck.user_prompt
+    regenerated = _regenerate_semantic_deck(deck, prompt)
+    request.app.state.semantic_preview_deck = regenerated
+    return regenerated
+
+
+@router.post("/api/semantic-deck/regenerate-slide", response_model=SemanticPresentation)
+async def regenerate_semantic_slide(payload: RegenerateSlideRequest, request: Request) -> SemanticPresentation:
+    if not hasattr(request.app.state, "semantic_preview_deck"):
+        request.app.state.semantic_preview_deck = DesignerService().design_presentation(_build_default_semantic_deck())
+    deck: SemanticPresentation = request.app.state.semantic_preview_deck
+    prompt = payload.user_prompt if payload.user_prompt is not None else deck.user_prompt
+    regenerated = _regenerate_single_slide(deck, prompt, payload.slide_id)
+    request.app.state.semantic_preview_deck = regenerated
+    return regenerated
 
 
 @router.get("/api/projects")

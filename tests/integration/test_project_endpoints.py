@@ -9,6 +9,8 @@ def _payload() -> dict:
         "name": "Integration Project",
         "deck": {
             "metadata": {"title": "Integration Deck", "audience": "Team", "purpose": "Validate"},
+            "user_prompt": "Original integration prompt",
+            "prompt_last_updated_at": "2026-01-01T00:00:00+00:00",
             "slide_order": ["s1"],
             "slides": [
                 {
@@ -37,10 +39,36 @@ def test_project_save_list_load_and_export_json() -> None:
     load_response = client.get(f"/api/projects/{project_id}")
     assert load_response.status_code == 200
     assert load_response.json()["deck"]["metadata"]["title"] == "Integration Deck"
+    assert load_response.json()["deck"]["user_prompt"] == "Original integration prompt"
 
     json_export = client.get(f"/api/projects/{project_id}/export/json")
     assert json_export.status_code == 200
     assert "application/json" in json_export.headers["content-type"]
+
+
+def test_prompt_update_and_regeneration_endpoints() -> None:
+    client = TestClient(app)
+
+    base = client.get("/api/semantic-deck")
+    assert base.status_code == 200
+    assert "user_prompt" in base.json()
+
+    updated = client.put("/api/semantic-deck/prompt", json={"user_prompt": "Updated from integration test"})
+    assert updated.status_code == 200
+    assert updated.json()["user_prompt"] == "Updated from integration test"
+    assert updated.json()["prompt_last_updated_at"]
+
+    regenerated = client.post("/api/semantic-deck/regenerate", json={"user_prompt": "Deck regeneration prompt"})
+    assert regenerated.status_code == 200
+    assert regenerated.json()["user_prompt"] == "Deck regeneration prompt"
+
+    slide_id = regenerated.json()["slide_order"][0]
+    regenerated_slide = client.post(
+        "/api/semantic-deck/regenerate-slide",
+        json={"slide_id": slide_id, "user_prompt": "Single slide regeneration prompt"},
+    )
+    assert regenerated_slide.status_code == 200
+    assert regenerated_slide.json()["user_prompt"] == "Single slide regeneration prompt"
 
 
 def test_project_export_pptx() -> None:

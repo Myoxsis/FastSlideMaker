@@ -14,6 +14,11 @@ const exportJsonButton = document.getElementById("export-json");
 const exportPptxButton = document.getElementById("export-pptx");
 const projectNameInput = document.getElementById("project-name");
 const projectGalleryList = document.getElementById("project-gallery-list");
+const promptInput = document.getElementById("prompt-input");
+const promptUpdatedAt = document.getElementById("prompt-updated-at");
+const updatePromptButton = document.getElementById("update-prompt");
+const regenerateDeckButton = document.getElementById("regenerate-deck");
+const regenerateSlideButton = document.getElementById("regenerate-slide");
 let statusTimeout = null;
 
 function setStatus(message, isError = false) {
@@ -100,6 +105,14 @@ function renderDeckList() {
     .join("");
 
   deckList.innerHTML = listMarkup;
+}
+
+function renderPromptPanel() {
+  if (!appState.deck) return;
+  promptInput.value = appState.deck.user_prompt || "";
+  promptUpdatedAt.textContent = appState.deck.prompt_last_updated_at
+    ? `Last updated: ${appState.deck.prompt_last_updated_at}`
+    : "Last updated: never";
 }
 
 function renderTextBlocks(textBlocks) {
@@ -279,6 +292,7 @@ function renderJsonModel() {
 }
 
 function refreshUi() {
+  renderPromptPanel();
   renderProjectGallery();
   renderDeckList();
   renderSlidePreview();
@@ -420,6 +434,74 @@ async function loadProject(projectId) {
   }
 }
 
+async function updatePrompt() {
+  if (!appState.deck) return;
+
+  updatePromptButton.disabled = true;
+  updatePromptButton.textContent = "Updating...";
+  try {
+    const response = await fetch("/api/semantic-deck/prompt", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_prompt: promptInput.value }),
+    });
+    appState.deck = await parseJsonResponse(response);
+    refreshUi();
+    setStatus("Prompt updated.");
+  } catch (error) {
+    setStatus(`Prompt update failed: ${error.message}`, true);
+  } finally {
+    updatePromptButton.disabled = false;
+    updatePromptButton.textContent = "Update prompt";
+  }
+}
+
+async function regenerateDeck() {
+  if (!appState.deck) return;
+  regenerateDeckButton.disabled = true;
+  regenerateDeckButton.textContent = "Regenerating...";
+  try {
+    const response = await fetch("/api/semantic-deck/regenerate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_prompt: promptInput.value }),
+    });
+    appState.deck = await parseJsonResponse(response);
+    appState.selectedSlideId = appState.deck.slide_order[0];
+    refreshUi();
+    setStatus("Deck regenerated from prompt.");
+  } catch (error) {
+    setStatus(`Deck regeneration failed: ${error.message}`, true);
+  } finally {
+    regenerateDeckButton.disabled = false;
+    regenerateDeckButton.textContent = "Regenerate deck";
+  }
+}
+
+async function regenerateSelectedSlide() {
+  if (!appState.deck || !appState.selectedSlideId) return;
+  regenerateSlideButton.disabled = true;
+  regenerateSlideButton.textContent = "Regenerating...";
+  try {
+    const response = await fetch("/api/semantic-deck/regenerate-slide", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        slide_id: appState.selectedSlideId,
+        user_prompt: promptInput.value,
+      }),
+    });
+    appState.deck = await parseJsonResponse(response);
+    refreshUi();
+    setStatus("Selected slide regenerated from prompt.");
+  } catch (error) {
+    setStatus(`Slide regeneration failed: ${error.message}`, true);
+  } finally {
+    regenerateSlideButton.disabled = false;
+    regenerateSlideButton.textContent = "Regenerate selected slide";
+  }
+}
+
 async function downloadExport(type) {
   if (!appState.selectedProjectId) {
     await saveDeck();
@@ -474,6 +556,9 @@ slidePreview.addEventListener(
 saveButton.addEventListener("click", saveDeck);
 exportJsonButton.addEventListener("click", () => downloadExport("json"));
 exportPptxButton.addEventListener("click", () => downloadExport("pptx"));
+updatePromptButton.addEventListener("click", updatePrompt);
+regenerateDeckButton.addEventListener("click", regenerateDeck);
+regenerateSlideButton.addEventListener("click", regenerateSelectedSlide);
 
 loadDeck();
 loadProjects();
