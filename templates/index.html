@@ -3,36 +3,40 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Fast Slide Maker</title>
+    <title>Fast Slide Maker — Semantic Preview</title>
     <link rel="stylesheet" href="/static/css/styles.css" />
   </head>
   <body>
-    <main>
-      <h1>Fast Slide Maker</h1>
-      <p>Generate structured slide decks with Ollama-backed or mock mode output.</p>
+    <main class="app-shell">
+      <header class="app-header">
+        <div>
+          <h1>Semantic Slide Preview</h1>
+          <p>Deterministic HTML rendering powered by semantic JSON.</p>
+        </div>
+        <button id="save-deck" type="button">Save JSON Model</button>
+      </header>
 
-      <form id="deck-form">
-        <label for="topic">Topic</label>
-        <input id="topic" name="topic" placeholder="Quarterly business review" required />
+      <section class="workspace">
+        <aside class="deck-panel" aria-label="Slide list">
+          <h2>Deck</h2>
+          <ul id="deck-list"></ul>
+        </aside>
 
-        <label for="audience">Audience</label>
-        <input id="audience" name="audience" value="Leadership team" />
+        <section class="slide-panel">
+          <div class="slide-toolbar">
+            <div>
+              <span class="muted">Selected slide</span>
+              <h2 id="slide-title-label"></h2>
+            </div>
+          </div>
+          <article id="slide-preview" class="slide-preview" aria-live="polite"></article>
+        </section>
+      </section>
 
-        <label for="tone">Tone</label>
-        <select id="tone" name="tone">
-          <option>Professional</option>
-          <option>Educational</option>
-          <option>Persuasive</option>
-        </select>
-
-        <label for="slide_count">Slide count</label>
-        <input id="slide_count" name="slide_count" type="number" min="3" max="30" value="6" />
-
-        <button type="submit">Generate Deck</button>
-      </form>
-
-      <h2>Response</h2>
-      <pre id="output">Submit the form to generate a deck.</pre>
+      <section class="json-panel">
+        <h2>Semantic JSON (source of truth)</h2>
+        <pre id="json-output"></pre>
+      </section>
     </main>
 
     <script src="/static/js/app.js"></script>
