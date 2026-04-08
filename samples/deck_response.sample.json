@@ -1,0 +1,28 @@
+{
+  "deck": {
+    "title": "AI adoption roadmap Overview",
+    "theme": "clean-blue",
+    "slides": [
+      {
+        "title": "AI adoption roadmap — Slide 1",
+        "bullets": [
+          "Key point 1.1 for Executive leadership",
+          "Key point 1.2 with professional tone",
+          "Action item 1.3"
+        ],
+        "notes": "Generated in mock mode because Ollama is unavailable. [Render position: 1]"
+      }
+    ],
+    "metadata": {
+      "mode": "mock",
+      "model": "llama3.1",
+      "validated": true,
+      "rendered": true
+    }
+  },
+  "export": {
+    "json": "artifacts/last_generated_deck.json",
+    "pptx": null,
+    "pdf": null
+  }
+}

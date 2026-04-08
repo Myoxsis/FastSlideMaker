@@ -4,34 +4,37 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fast Slide Maker</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/css/styles.css" />
   </head>
   <body>
-    <header>
+    <main>
       <h1>Fast Slide Maker</h1>
-      <p>JSON-first slide generation for process and solution design.</p>
-    </header>
+      <p>Generate structured slide decks with Ollama-backed or mock mode output.</p>
 
-    <section class="controls">
-      <textarea id="prompt" rows="3">Create a 5-slide deck explaining the lead-to-cash process and the target solution architecture.</textarea>
-      <div class="row">
-        <input id="model" value="llama3" />
-        <button id="generateBtn">Generate Deck</button>
-        <button id="exportBtn" disabled>Export PPTX</button>
-      </div>
-      <pre id="status"></pre>
-    </section>
+      <form id="deck-form">
+        <label for="topic">Topic</label>
+        <input id="topic" name="topic" placeholder="Quarterly business review" required />
 
-    <section>
-      <h2>Rendered Preview</h2>
-      <div id="slides"></div>
-    </section>
+        <label for="audience">Audience</label>
+        <input id="audience" name="audience" value="Leadership team" />
 
-    <section>
-      <h2>Semantic JSON (source of truth)</h2>
-      <pre id="jsonOutput"></pre>
-    </section>
+        <label for="tone">Tone</label>
+        <select id="tone" name="tone">
+          <option>Professional</option>
+          <option>Educational</option>
+          <option>Persuasive</option>
+        </select>
 
-    <script src="/static/app.js"></script>
+        <label for="slide_count">Slide count</label>
+        <input id="slide_count" name="slide_count" type="number" min="3" max="30" value="6" />
+
+        <button type="submit">Generate Deck</button>
+      </form>
+
+      <h2>Response</h2>
+      <pre id="output">Submit the form to generate a deck.</pre>
+    </main>
+
+    <script src="/static/js/app.js"></script>
   </body>
 </html>
