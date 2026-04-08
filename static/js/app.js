@@ -219,6 +219,36 @@ function renderRoadmapSlide(slide) {
   `;
 }
 
+function renderSwimlaneSlide(slide) {
+  const lanes = slide.swimlanes?.lanes || [];
+  return `
+    <section class="swimlane-grid">
+      ${lanes
+        .map(
+          (lane) => `
+          <article class="swimlane-row">
+            <h4 contenteditable="true" data-edit-type="swimlane-label" data-lane-id="${lane.id}">${escapeHtml(lane.lane_label)}</h4>
+            <div class="swimlane-items">
+              ${(lane.items || [])
+                .map(
+                  (item) => `
+                  <div class="swimlane-item">
+                    <strong contenteditable="true" data-edit-type="swimlane-item-label" data-lane-id="${lane.id}" data-item-id="${item.id}">${escapeHtml(item.label)}</strong>
+                    <p contenteditable="true" data-edit-type="swimlane-item-detail" data-lane-id="${lane.id}" data-item-id="${item.id}">${escapeHtml(item.detail || "")}</p>
+                  </div>
+                `
+                )
+                .join("")}
+            </div>
+          </article>
+        `
+        )
+        .join("")}
+    </section>
+    ${renderTextBlocks(slide.text_blocks)}
+  `;
+}
+
 function renderSlidePreview() {
   const slide = getSelectedSlide();
   if (!slide) {
@@ -232,6 +262,7 @@ function renderSlidePreview() {
   if (slide.type === "process") body = renderProcessSlide(slide);
   else if (slide.type === "architecture") body = renderArchitectureSlide(slide);
   else if (slide.type === "roadmap") body = renderRoadmapSlide(slide);
+  else if (slide.type === "swimlane") body = renderSwimlaneSlide(slide);
   else body = renderTextBlocks(slide.text_blocks);
 
   slidePreview.innerHTML = `
@@ -310,6 +341,17 @@ function persistEdit(element) {
     const phase = slide.roadmap?.phases.find((item) => item.id === element.dataset.phaseId);
     const milestone = phase?.milestones.find((item) => item.id === element.dataset.milestoneId);
     if (milestone) milestone.target_period = textValue;
+  } else if (editType === "swimlane-label") {
+    const lane = slide.swimlanes?.lanes.find((item) => item.id === element.dataset.laneId);
+    if (lane) lane.lane_label = textValue;
+  } else if (editType === "swimlane-item-label") {
+    const lane = slide.swimlanes?.lanes.find((item) => item.id === element.dataset.laneId);
+    const item = lane?.items.find((entry) => entry.id === element.dataset.itemId);
+    if (item) item.label = textValue;
+  } else if (editType === "swimlane-item-detail") {
+    const lane = slide.swimlanes?.lanes.find((item) => item.id === element.dataset.laneId);
+    const item = lane?.items.find((entry) => entry.id === element.dataset.itemId);
+    if (item) item.detail = textValue;
   }
 
   refreshUi();
