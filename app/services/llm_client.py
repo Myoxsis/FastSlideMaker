@@ -1,12 +1,16 @@
-"""Local Ollama HTTP client for deck planning and slide JSON generation."""
+"""Local Ollama HTTP client with multi-step prompting for semantic slide generation."""
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+import logging
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import httpx
+
+LOGGER = logging.getLogger(__name__)
 
 
 class LLMClientError(RuntimeError):
@@ -17,167 +21,209 @@ class OllamaUnavailableError(LLMClientError):
     """Raised when Ollama is unreachable or not running."""
 
 
+PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+
+
 @dataclass(slots=True)
 class LLMClientConfig:
     """Configuration for the Ollama LLM client."""
 
     host: str = "http://localhost:11434"
     model: str = "llama3.1"
-    temperature: float = 0.4
-    max_tokens: int = 1200
-    system_prompt: str = """
-You are BizDeck-Architect, a business presentation planner specialized in process design and IT solution design.
-
-CRITICAL OUTPUT RULES
-1) Return valid JSON only.
-2) Never return Markdown.
-3) Never return prose outside JSON.
-4) If unsure, still output best-effort valid JSON that matches the contract.
-
-JSON OUTPUT CONTRACT
-{
-  "metadata": {
-    "title": "string",
-    "subtitle": "string|null",
-    "audience": "string",
-    "purpose": "string"
-  },
-  "slides": [
-    {
-      "id": "s1",
-      "order": 1,
-      "type": "title|agenda|section_break|content|diagram|process|swimlane|architecture|integrations|roadmap|issue_implication_recommendation|summary",
-      "title": "short label",
-      "objective": "short sentence",
-      "text_blocks": [
-        {
-          "id": "tb1",
-          "role": "headline|body|bullet|callout|metric|footnote",
-          "label": "optional short label",
-          "text": "content text"
-        }
-      ],
-      "diagram": {
-        "nodes": [{"id": "n1", "label": "short", "description": "optional", "category": "optional"}],
-        "edges": [{"source_id": "n1", "target_id": "n2", "label": "optional", "style": "solid|dashed|dotted"}]
-      },
-      "process": {
-        "steps": [{"id": "p1", "label": "short", "description": "optional", "owner": "optional", "outputs": ["short"]}]
-      },
-      "swimlanes": {
-        "lanes": [{"id": "l1", "lane_label": "short", "items": [{"id": "i1", "label": "short", "detail": "optional"}]}]
-      },
-      "architecture": {
-        "layers": [{"id": "a1", "name": "short", "responsibility": "short", "components": ["short"]}],
-        "integrations": [{"id": "int1", "system": "short", "purpose": "short", "direction": "short", "protocol": "optional"}]
-      },
-      "integrations": [{"id": "int1", "system": "short", "purpose": "short", "direction": "short", "protocol": "optional"}],
-      "roadmap": {
-        "phases": [{"id": "r1", "name": "short", "objective": "short", "milestones": [{"id": "m1", "label": "short", "status": "planned|in_progress|at_risk|complete", "target_period": "Q1 2027"}]}]
-      },
-      "issue_implication_recommendation": {
-        "blocks": [{"issue": "text", "implication": "text", "recommendation": "text", "priority": "low|medium|high|critical"}]
-      }
-    }
-  ],
-  "slide_order": ["s1", "s2"]
-}
-
-SLIDE-TYPE SELECTION RULES
-- Choose only allowed slide types listed in the contract.
-- Use type-specific fields only when the type requires them:
-  - diagram -> diagram
-  - process -> process
-  - swimlane -> swimlanes
-  - architecture -> architecture
-  - integrations -> integrations
-  - roadmap -> roadmap
-  - issue_implication_recommendation -> issue_implication_recommendation
-- Prefer consulting flow: title -> agenda -> section/content/problem analysis -> process/architecture/integrations -> roadmap -> summary.
-- Use section_break only for major transitions.
-
-CONTENT DENSITY RULES
-- Keep labels concise (2-6 words preferred).
-- Keep slide title short (<= 8 words).
-- Keep objective to one sentence.
-- Avoid dense walls of text; prefer bullets and semantic structures.
-- Keep each slide focused on one core message.
-- Keep semantic item count moderate; do not overload a single slide.
-
-EXECUTIVE CLARITY RULES
-- Lead with business outcome, then evidence, then recommendation.
-- Use precise, decision-oriented wording.
-- Prioritize risks, implications, and actions.
-- Make every slide answer: "So what?" and "What next?"
-
-PROCESS AND ARCHITECTURE UNDERSTANDING RULES
-- For process content: show sequence, owners, and outputs.
-- For swimlanes: separate responsibilities by role/team clearly.
-- For architecture: separate layers, responsibilities, and key components.
-- For integrations: state system, purpose, and direction explicitly.
-- Prefer semantic meaning over visual instructions.
-
-NON-GOALS
-- Do not output coordinates, pixel positions, CSS, or rendering instructions.
-- Do not include explanatory text outside the JSON payload.
-""".strip()
-    timeout_seconds: float = 20.0
+    temperature: float = 0.2
+    max_tokens: int = 1800
+    timeout_seconds: float = 30.0
     use_chat_api: bool = True
     enable_mock_mode: bool = False
+    system_prompt: str = field(default_factory=lambda: _load_prompt("system_prompt.txt"))
+
+
+def _load_prompt(filename: str) -> str:
+    path = PROMPTS_DIR / filename
+    if not path.exists():
+        raise LLMClientError(f"Prompt file is missing: {path}")
+    return path.read_text(encoding="utf-8").strip()
 
 
 class OllamaLLMClient:
-    """Production-sensible local HTTP client for Ollama.
-
-    Supports both `/api/chat` and `/api/generate`, with graceful fallback to mock mode
-    when configured.
-    """
+    """Production-sensible local HTTP client for Ollama."""
 
     def __init__(self, config: LLMClientConfig | None = None) -> None:
         self.config = config or LLMClientConfig()
+        self._deck_planning_prompt = _load_prompt("deck_planning_prompt.txt")
+        self._slide_generation_prompt = _load_prompt("slide_generation_prompt.txt")
+        self._json_repair_prompt = _load_prompt("json_repair_prompt.txt")
+
+    async def generate_deck_plan(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Generate a deck plan JSON with retry + repair fallback."""
+        prompt = self._build_deck_plan_prompt(request)
+        raw = await self._complete(prompt, task_name="deck planning")
+        parsed = self._parse_json(raw)
+        if parsed is not None:
+            return parsed
+
+        LOGGER.warning("Deck planning JSON parse failed; running repair prompt.")
+        return await self.repair_json(
+            raw,
+            schema_hint={
+                "deck_title": "string",
+                "audience": "string",
+                "deck_objective": "string",
+                "slides": [
+                    {
+                        "id": "s1",
+                        "slide_type": "executive_summary|process_flow|layered_architecture|roadmap",
+                        "objective": "string",
+                        "key_message": "string",
+                    }
+                ],
+            },
+        )
+
+    async def generate_slide(
+        self,
+        deck_context: dict[str, Any],
+        slide_plan_item: dict[str, Any],
+        previous_slides: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Generate one semantic slide JSON with retry + repair fallback."""
+        prompt = self._build_slide_prompt(deck_context, slide_plan_item, previous_slides or [])
+        raw = await self._complete(prompt, task_name="slide generation")
+        parsed = self._parse_json(raw)
+        if parsed is not None:
+            return parsed
+
+        LOGGER.warning("Slide JSON parse failed for %s; running repair prompt.", slide_plan_item.get("id"))
+        schema_hint = {
+            "id": slide_plan_item.get("id", "s1"),
+            "order": slide_plan_item.get("order", 1),
+            "type": self._to_schema_slide_type(str(slide_plan_item.get("slide_type", "executive_summary"))),
+            "title": "string",
+            "objective": str(slide_plan_item.get("objective", "")),
+        }
+        return await self.repair_json(raw, schema_hint=schema_hint)
+
+    async def repair_json(
+        self,
+        broken_output: str | None = None,
+        schema_hint: dict[str, Any] | None = None,
+        *,
+        malformed_json: str | None = None,
+        expected_shape_hint: str = "",
+    ) -> dict[str, Any]:
+        """Repair malformed JSON into valid schema-compliant JSON."""
+        normalized_broken_output = broken_output if broken_output is not None else malformed_json
+        if normalized_broken_output is None:
+            raise LLMClientError("repair_json requires broken_output or malformed_json.")
+
+        if schema_hint is None and expected_shape_hint:
+            schema_hint = {"expected_shape_hint": expected_shape_hint}
+
+        payload = {
+            "broken_output": normalized_broken_output,
+            "target_schema_hint": schema_hint or {},
+        }
+        prompt = f"{self._json_repair_prompt}\n\nINPUT_JSON:\n{json.dumps(payload, ensure_ascii=False)}"
+        repaired_raw = await self._complete(prompt, task_name="JSON repair")
+        repaired = self._parse_json(repaired_raw)
+        if repaired is None:
+            LOGGER.error("JSON repair failed; unable to parse repaired output.")
+            raise LLMClientError("LLM output could not be parsed after repair attempt.")
+        return repaired
 
     async def plan_deck(self, *, topic: str, audience: str, tone: str, slide_count: int) -> str:
-        """Create a high-level deck plan in JSON."""
-        prompt = (
-            "Return ONLY valid JSON with keys: title, theme, outline. "
-            "`outline` must be an array of objects with keys: slide_number, title, objective, bullets. "
-            f"Topic: {topic}\n"
-            f"Audience: {audience}\n"
-            f"Tone: {tone}\n"
-            f"Slide count: {slide_count}"
+        """Backwards-compatible wrapper returning a JSON string."""
+        plan = await self.generate_deck_plan(
+            {
+                "user_request": topic,
+                "constraints": {"audience": audience, "tone": tone, "slide_count": slide_count},
+            }
         )
-        return await self._complete(prompt, task_name="deck planning")
+        return json.dumps(plan)
 
     async def generate_slide_json(self, *, plan_json: str, slide_count: int) -> str:
-        """Generate full deck JSON for slide rendering."""
-        prompt = (
-            "Using the provided plan, return ONLY valid JSON with keys: title, theme, slides. "
-            "`slides` must contain objects with keys: title, bullets, notes. "
-            f"Target slide count: {slide_count}.\n"
-            f"Plan JSON:\n{plan_json}"
-        )
-        return await self._complete(prompt, task_name="slide JSON generation")
+        """Backwards-compatible wrapper returning exactly one slide JSON string."""
+        parsed_plan = self._parse_json(plan_json)
+        if not parsed_plan:
+            repaired_plan = await self.repair_json(plan_json)
+            parsed_plan = repaired_plan
 
-    async def repair_json(self, *, malformed_json: str, expected_shape_hint: str = "") -> str:
-        """Repair malformed model output into valid JSON, preserving meaning."""
-        shape_hint = f"Expected shape: {expected_shape_hint}\n" if expected_shape_hint else ""
-        prompt = (
-            "Fix the following malformed JSON. Return ONLY valid JSON and do not add explanation.\n"
-            f"{shape_hint}"
-            f"Malformed JSON:\n{malformed_json}"
-        )
-        return await self._complete(prompt, task_name="JSON repair")
+        deck_context = parsed_plan.get("deck_context") if isinstance(parsed_plan, dict) else None
+        if not isinstance(deck_context, dict):
+            deck_context = {
+                "deck_title": parsed_plan.get("deck_title", "Generated Deck") if isinstance(parsed_plan, dict) else "Generated Deck",
+                "audience": parsed_plan.get("audience", "Stakeholders") if isinstance(parsed_plan, dict) else "Stakeholders",
+                "deck_objective": parsed_plan.get("current_slide_objective", "") if isinstance(parsed_plan, dict) else "",
+            }
+
+        slide_plan_item: dict[str, Any] = {
+            "id": parsed_plan.get("target_slide", {}).get("id", "s1") if isinstance(parsed_plan, dict) else "s1",
+            "order": parsed_plan.get("target_slide", {}).get("order", 1) if isinstance(parsed_plan, dict) else 1,
+            "slide_type": parsed_plan.get("selected_slide_type", "executive_summary") if isinstance(parsed_plan, dict) else "executive_summary",
+            "objective": parsed_plan.get("current_slide_objective", "") if isinstance(parsed_plan, dict) else "",
+            "key_message": parsed_plan.get("target_slide", {}).get("title", "") if isinstance(parsed_plan, dict) else "",
+        }
+
+        slide = await self.generate_slide(deck_context=deck_context, slide_plan_item=slide_plan_item)
+        return json.dumps(slide)
 
     async def _complete(self, prompt: str, *, task_name: str) -> str:
         """Run a completion against Ollama with fallback behavior."""
+        LOGGER.debug("Running LLM task=%s model=%s", task_name, self.config.model)
         try:
             if self.config.use_chat_api:
                 return await self._chat_completion(prompt)
             return await self._generate_completion(prompt)
         except OllamaUnavailableError:
             if self.config.enable_mock_mode:
+                LOGGER.warning("Ollama unavailable; using mock response for task=%s", task_name)
                 return self._mock_response(task_name)
             raise
+
+    def _build_deck_plan_prompt(self, request: dict[str, Any]) -> str:
+        return (
+            f"{self._deck_planning_prompt}\n\n"
+            f"INPUT_JSON:\n{json.dumps(request, ensure_ascii=False)}"
+        )
+
+    def _build_slide_prompt(
+        self,
+        deck_context: dict[str, Any],
+        slide_plan_item: dict[str, Any],
+        previous_slides: list[dict[str, Any]],
+    ) -> str:
+        normalized_plan = dict(slide_plan_item)
+        normalized_plan["type"] = self._to_schema_slide_type(str(slide_plan_item.get("slide_type", "executive_summary")))
+        input_payload = {
+            "deck_context": deck_context,
+            "slide_plan_item": normalized_plan,
+            "previous_slides": previous_slides,
+        }
+        return (
+            f"{self._slide_generation_prompt}\n\n"
+            f"INPUT_JSON:\n{json.dumps(input_payload, ensure_ascii=False)}"
+        )
+
+    def _to_schema_slide_type(self, slide_type: str) -> str:
+        mapping = {
+            "executive_summary": "summary",
+            "process_flow": "process",
+            "layered_architecture": "architecture",
+            "roadmap": "roadmap",
+            "summary": "summary",
+            "process": "process",
+            "architecture": "architecture",
+        }
+        return mapping.get(slide_type, "content")
+
+    def _parse_json(self, payload: str) -> dict[str, Any] | None:
+        try:
+            parsed = json.loads(payload)
+        except json.JSONDecodeError:
+            return None
+        if isinstance(parsed, dict):
+            return parsed
+        return None
 
     async def _chat_completion(self, prompt: str) -> str:
         body: dict[str, Any] = {
@@ -259,15 +305,28 @@ class OllamaLLMClient:
         if task_name == "deck planning":
             return json.dumps(
                 {
-                    "title": "Mock Deck Plan",
-                    "theme": "clean-blue",
-                    "outline": [
+                    "deck_title": "Order-to-Cash Improvement Plan",
+                    "audience": "Executive stakeholders",
+                    "deck_objective": "Align on process, architecture, and transformation roadmap.",
+                    "slides": [
                         {
-                            "slide_number": 1,
-                            "title": "Overview",
-                            "objective": "Set context",
-                            "bullets": ["Goal", "Audience needs", "Outcome"],
-                        }
+                            "id": "s1",
+                            "slide_type": "executive_summary",
+                            "objective": "Summarize business case",
+                            "key_message": "Current flow creates avoidable margin leakage.",
+                        },
+                        {
+                            "id": "s2",
+                            "slide_type": "process_flow",
+                            "objective": "Show bottlenecks",
+                            "key_message": "Manual handoffs slow cycle time.",
+                        },
+                        {
+                            "id": "s3",
+                            "slide_type": "layered_architecture",
+                            "objective": "Define target capabilities",
+                            "key_message": "Platform-based services decouple channels and core systems.",
+                        },
                     ],
                 }
             )
@@ -277,14 +336,15 @@ class OllamaLLMClient:
 
         return json.dumps(
             {
-                "title": "Mock Slide Deck",
-                "theme": "clean-blue",
-                "slides": [
-                    {
-                        "title": "Intro",
-                        "bullets": ["Mock mode enabled", "Ollama unavailable"],
-                        "notes": "Replace with live generation when Ollama is running.",
-                    }
+                "id": "s1",
+                "order": 1,
+                "type": "summary",
+                "title": "Executive Summary",
+                "objective": "Highlight the primary decision and next step.",
+                "text_blocks": [
+                    {"id": "tb1", "role": "bullet", "text": "Cycle time is too long."},
+                    {"id": "tb2", "role": "bullet", "text": "Automate credit checks and invoicing."},
+                    {"id": "tb3", "role": "bullet", "text": "Launch phased rollout over 2 quarters."},
                 ],
             }
         )

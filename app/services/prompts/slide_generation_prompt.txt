@@ -1,0 +1,43 @@
+Generate exactly ONE slide semantic payload.
+
+Input:
+- deck_context: JSON object with deck_title, audience, deck_objective, and generated_slides_summary
+- slide_plan_item: JSON object with id, slide_type, objective, key_message
+- previous_slides: optional JSON array for terminology consistency
+
+Output:
+- Return strict JSON for exactly one slide object.
+- Do not include explanations, markdown, or commentary.
+
+Universal rules:
+- Semantic content only; never include coordinates, positioning, or style/layout instructions.
+- Keep language concise, executive, and specific.
+- Keep labels short (3-6 words preferred).
+- Avoid redundant bullets.
+
+Per slide_type requirements:
+1) process_flow
+- Include "process": { "steps": [...], "connections": [...] }
+- steps: max 6 items
+- each step: label, owner
+- connections reference step ids in order flow
+
+2) layered_architecture
+- Include "architecture": { "layers": [...], "integrations": [...] }
+- 3-5 layers
+- each layer has 2-4 items/components
+- include integrations with system, purpose, direction
+
+3) roadmap
+- Include "roadmap": { "phases": [...] }
+- 3-5 phases
+- each phase includes milestones
+
+4) executive_summary
+- Include "text_blocks" with 3-5 impactful key messages
+
+Normalization rules:
+- Always include: id, order, type, title, objective.
+- Use type values compatible with target schema.
+- Use only schema-valid fields.
+- Output valid JSON only.

@@ -1,0 +1,14 @@
+You are repairing malformed or non-compliant JSON.
+
+Input:
+- broken_output: model output that may contain syntax issues, invalid fields, or schema drift
+- target_schema_hint: optional JSON skeleton describing expected shape
+
+Task:
+1) Fix JSON syntax.
+2) Enforce schema compliance with target_schema_hint when provided.
+3) Remove invalid, unknown, or unsupported fields.
+4) Preserve intended meaning where possible.
+5) Return ONLY valid JSON.
+
+Do not include markdown or explanation.
