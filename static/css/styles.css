@@ -48,6 +48,25 @@ button { border:1px solid #b7c4dc; background:#f9fbff; border-radius:8px; paddin
 
 .shape-element { position:absolute; display:grid; place-items:center; font-size:12px; overflow:hidden; }
 .shape-line,.shape-divider,.shape-arrow,.shape-connector { align-content:center; }
+.shape-element.is-selected { cursor:move; }
+.shape-element.is-dragging { opacity:0.92; }
+.resize-handle {
+  position:absolute;
+  width:10px;
+  height:10px;
+  border:1px solid #1d4ed8;
+  border-radius:999px;
+  background:#fff;
+  padding:0;
+  z-index:3;
+}
+.handle-nw { left:-5px; top:-5px; cursor:nwse-resize; }
+.handle-ne { right:-5px; top:-5px; cursor:nesw-resize; }
+.handle-sw { left:-5px; bottom:-5px; cursor:nesw-resize; }
+.handle-se { right:-5px; bottom:-5px; cursor:nwse-resize; }
+.canvas-guide { position:absolute; pointer-events:none; z-index:2; display:none; }
+.x-guide { top:0; bottom:0; width:1px; background:#93c5fd; }
+.y-guide { left:0; right:0; height:1px; background:#93c5fd; }
 
 .inspector-panel { display:grid; align-content:start; gap:8px; }
 .inspector-panel label { display:grid; gap:4px; font-size:13px; }
