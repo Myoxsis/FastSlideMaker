@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from app.models.schemas import DeckRequest, DeckResponse, MilestoneStatus, SemanticPresentation, SlideType, TextRole
 from app.services.export import ExportService
 from app.services.generation import GenerationService
+from app.services.mock_mode import CANNED_SAMPLE_PROMPTS, DECK_TEMPLATES
 from app.services.rendering import RenderingService
 from app.services.validation import ValidationService
 from project_store import ProjectStore
@@ -291,3 +292,11 @@ async def generate_slides(payload: DeckRequest, request: Request) -> DeckRespons
     export_artifacts = ExportService().export(rendered_deck)
 
     return DeckResponse(deck=rendered_deck, export=export_artifacts)
+
+
+@router.get("/api/mock-mode/examples")
+async def get_mock_examples() -> dict:
+    return {
+        "prompts": CANNED_SAMPLE_PROMPTS,
+        "sample_outputs": DECK_TEMPLATES,
+    }
